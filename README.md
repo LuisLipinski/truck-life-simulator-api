@@ -88,6 +88,10 @@ O código está dividido por capacidade de negócio, não por camada global:
 
 `platform` contém capacidades técnicas expostas pela fundação e `shared` mantém somente primitivas realmente transversais. Consulte [docs/architecture.md](docs/architecture.md) para as regras de evolução.
 
+## Identidade e segurança
+
+A P2 começa pelo contrato de conta, senha, access/refresh token, rotação, revogação, CORS, CSRF e recuperação. Consulte [docs/identity-security.md](docs/identity-security.md) antes de alterar o módulo `identity` ou criar migrations relacionadas.
+
 ## Perfis
 
 | Perfil | Uso | Configuração sensível |
