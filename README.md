@@ -6,18 +6,18 @@ Esta entrega inaugura a P1: a fundação técnica do backend. Ela define os limi
 
 ## Stack
 
-- Java 21
-- Spring Boot 3.5
+- Java 25 LTS
+- Spring Boot 4.1
 - Maven 3.9+
 - PostgreSQL 17
 - Flyway
 - OpenAPI/Swagger UI
-- JUnit 5, MockMvc, ArchUnit e Testcontainers
+- JUnit 6, MockMvc, RestTestClient, ArchUnit e Testcontainers
 - Docker/OCI e GitHub Actions
 
 ## Executar localmente
 
-Pré-requisitos: JDK 21, Maven 3.9+ e Docker com Compose.
+Pré-requisitos: JDK 25, Maven 3.9+ e Docker com Compose.
 
 ```bash
 docker compose up -d postgres
