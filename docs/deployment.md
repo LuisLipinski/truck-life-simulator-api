@@ -10,9 +10,15 @@ A aplicação é distribuída como imagem OCI e deve ser executada com o perfil 
 | `DB_URL` | sim | URL JDBC do PostgreSQL |
 | `DB_USERNAME` | sim | usuário do banco |
 | `DB_PASSWORD` | sim | segredo do banco |
+| `AUTH_JWT_SECRET_BASE64` | sim | segredo Base64 de no mínimo 32 bytes para assinar access tokens |
+| `AUTH_JWT_ISSUER` | sim | emissor exato aceito nos access tokens |
+| `AUTH_JWT_AUDIENCE` | sim | audiência exata aceita nos access tokens |
+| `AUTH_ALLOWED_ORIGINS` | sim | lista separada por vírgulas das origens HTTPS oficiais, sem curingas |
 | `PORT` | não | porta HTTP; padrão `8080` |
 | `DB_MAX_POOL_SIZE` | não | máximo de conexões; padrão `10` |
 | `DB_MIN_IDLE` | não | conexões ociosas mínimas; padrão `2` |
+| `AUTH_ACCESS_TOKEN_TTL` | não | validade do access token; padrão `PT10M` |
+| `AUTH_REFRESH_TOKEN_TTL` | não | validade do refresh token; padrão `P30D` |
 
 O PostgreSQL deve estar acessível antes do start. O Flyway aplica migrações aditivas automaticamente e o Hibernate somente valida o resultado.
 
@@ -34,9 +40,15 @@ SPRING_PROFILES_ACTIVE=prod
 DB_URL=jdbc:postgresql://<host-direto-do-neon>/<banco>?sslmode=require
 DB_USERNAME=<role-do-neon>
 DB_PASSWORD=<senha-do-neon>
+AUTH_JWT_SECRET_BASE64=<segredo-base64-com-32-bytes-ou-mais>
+AUTH_JWT_ISSUER=https://truck-life-simulator-api.onrender.com
+AUTH_JWT_AUDIENCE=truck-life-simulator
+AUTH_ALLOWED_ORIGINS=https://<frontend-oficial>
 ```
 
 Não cadastre `PORT`: o Render fornece esse valor e a aplicação o utiliza automaticamente. Credenciais reais pertencem somente aos segredos do Render e nunca devem ser adicionadas ao repositório.
+
+O segredo JWT deve ser gerado a partir de pelo menos 32 bytes aleatórios. Nunca reutilize senha, chave de banco ou o valor local de testes. As origens CORS devem ser completas e exatas; não use `*`, caminhos ou origens HTTP fora de `localhost`.
 
 ## Publicação
 

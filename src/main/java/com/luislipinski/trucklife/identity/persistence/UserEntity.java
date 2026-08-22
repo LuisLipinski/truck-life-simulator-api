@@ -144,4 +144,12 @@ public class UserEntity {
             status = UserStatus.ACTIVE;
         }
     }
+
+    public void recordSuccessfulLogin(Instant loginAt, String upgradedPasswordHash) {
+        lastLoginAt = loginAt;
+        updatedAt = loginAt;
+        if (upgradedPasswordHash != null) {
+            passwordHash = upgradedPasswordHash;
+        }
+    }
 }

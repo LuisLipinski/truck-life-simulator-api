@@ -45,6 +45,13 @@ springdoc:
 
 identity:
   email-verification-ttl: ${AUTH_EMAIL_VERIFICATION_TTL:PT24H}
+  session:
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:PT10M}
+    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:P30D}
+    refresh-cookie-name: TLS_REFRESH_TOKEN
+    refresh-cookie-path: /api/v1/auth
+  web:
+    csrf-cookie-name: TLS_CSRF_TOKEN
   rate-limit:
     registration:
       max-attempts: ${AUTH_REGISTER_RATE_LIMIT_ATTEMPTS:5}
@@ -55,6 +62,12 @@ identity:
     resend-verification:
       max-attempts: ${AUTH_RESEND_VERIFICATION_RATE_LIMIT_ATTEMPTS:3}
       window: ${AUTH_RESEND_VERIFICATION_RATE_LIMIT_WINDOW:PT1H}
+    login:
+      max-attempts: ${AUTH_LOGIN_RATE_LIMIT_ATTEMPTS:10}
+      window: ${AUTH_LOGIN_RATE_LIMIT_WINDOW:PT15M}
+    refresh:
+      max-attempts: ${AUTH_REFRESH_RATE_LIMIT_ATTEMPTS:30}
+      window: ${AUTH_REFRESH_RATE_LIMIT_WINDOW:PT1M}
 
 info:
   app:

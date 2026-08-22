@@ -101,6 +101,18 @@ public class RefreshTokenEntity {
         this.revokedAt = replacementTime;
     }
 
+    public void markRevoked(Instant revocationTime) {
+        if (revokedAt == null) {
+            revokedAt = revocationTime;
+        }
+    }
+
+    public void markReuseDetected(Instant detectionTime) {
+        if (reuseDetectedAt == null) {
+            reuseDetectedAt = detectionTime;
+        }
+    }
+
     public UUID getId() {
         return id;
     }

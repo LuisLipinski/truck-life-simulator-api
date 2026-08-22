@@ -19,3 +19,11 @@ server:
 logging:
   pattern:
     level: '%5p [correlationId=%X{correlationId:-}]'
+
+identity:
+  session:
+    jwt-secret-base64: ${AUTH_JWT_SECRET_BASE64}
+    issuer: ${AUTH_JWT_ISSUER}
+    audience: ${AUTH_JWT_AUDIENCE}
+  web:
+    allowed-origins: ${AUTH_ALLOWED_ORIGINS}

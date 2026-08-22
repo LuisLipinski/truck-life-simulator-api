@@ -18,13 +18,17 @@ public record IdentityProperties(
     public record RateLimits(
             Policy registration,
             Policy emailVerification,
-            Policy resendVerification
+            Policy resendVerification,
+            Policy login,
+            Policy refresh
     ) {
 
         public RateLimits {
             Objects.requireNonNull(registration, "registration rate limit must be configured");
             Objects.requireNonNull(emailVerification, "email verification rate limit must be configured");
             Objects.requireNonNull(resendVerification, "resend rate limit must be configured");
+            Objects.requireNonNull(login, "login rate limit must be configured");
+            Objects.requireNonNull(refresh, "refresh rate limit must be configured");
         }
     }
 
