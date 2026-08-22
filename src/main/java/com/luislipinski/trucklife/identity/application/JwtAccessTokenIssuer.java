@@ -1,12 +1,8 @@
 package com.luislipinski.trucklife.identity.application;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luislipinski.trucklife.identity.config.IdentitySessionProperties;
 import com.luislipinski.trucklife.identity.domain.UserRole;
 import com.luislipinski.trucklife.identity.persistence.UserEntity;
-import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.GeneralSecurityException;
 import java.security.MessageDigest;
@@ -20,6 +16,9 @@ import java.util.UUID;
 import javax.crypto.Mac;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.stereotype.Component;
+import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 @Component
 public class JwtAccessTokenIssuer {
@@ -140,7 +139,7 @@ public class JwtAccessTokenIssuer {
     private String encodeJson(Map<String, Object> value) {
         try {
             return BASE64_URL_ENCODER.encodeToString(objectMapper.writeValueAsBytes(value));
-        } catch (JsonProcessingException exception) {
+        } catch (JacksonException exception) {
             throw new IllegalStateException("JWT claims could not be serialized", exception);
         }
     }
@@ -148,7 +147,7 @@ public class JwtAccessTokenIssuer {
     private Map<String, Object> decodeJson(String encoded) {
         try {
             return objectMapper.readValue(decodeBase64(encoded), JSON_OBJECT);
-        } catch (IOException exception) {
+        } catch (JacksonException exception) {
             throw invalidToken();
         }
     }

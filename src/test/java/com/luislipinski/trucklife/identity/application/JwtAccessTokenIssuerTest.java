@@ -3,7 +3,6 @@ package com.luislipinski.trucklife.identity.application;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luislipinski.trucklife.identity.config.IdentitySessionProperties;
 import com.luislipinski.trucklife.identity.domain.UserRole;
 import com.luislipinski.trucklife.identity.domain.UserStatus;
@@ -14,6 +13,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
+import tools.jackson.databind.ObjectMapper;
 
 class JwtAccessTokenIssuerTest {
 

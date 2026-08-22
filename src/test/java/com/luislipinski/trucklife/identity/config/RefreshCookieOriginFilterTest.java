@@ -2,8 +2,6 @@ package com.luislipinski.trucklife.identity.config;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.luislipinski.trucklife.shared.error.ApiSecurityProblemWriter;
 import jakarta.servlet.http.Cookie;
 import java.security.SecureRandom;
@@ -14,11 +12,13 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.mock.web.MockFilterChain;
 import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.mock.web.MockHttpServletResponse;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 class RefreshCookieOriginFilterTest {
 
     private static final String ORIGIN = "https://app.example.com";
-    private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
+    private final ObjectMapper objectMapper = new ObjectMapper();
     private final IdentityWebProperties webProperties = new IdentityWebProperties(
             List.of(ORIGIN),
             "TLS_CSRF_TOKEN"
