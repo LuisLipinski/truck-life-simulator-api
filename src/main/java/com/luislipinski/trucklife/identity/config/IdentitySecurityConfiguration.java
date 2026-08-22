@@ -13,7 +13,11 @@ import org.springframework.security.crypto.password.DelegatingPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Configuration(proxyBeanMethods = false)
-@EnableConfigurationProperties(IdentityProperties.class)
+@EnableConfigurationProperties({
+        IdentityProperties.class,
+        IdentitySessionProperties.class,
+        IdentityWebProperties.class
+})
 public class IdentitySecurityConfiguration {
 
     static final String PASSWORD_ENCODING_ID = "argon2id-v1";

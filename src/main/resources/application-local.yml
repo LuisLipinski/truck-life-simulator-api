@@ -12,3 +12,13 @@ spring:
 logging:
   pattern:
     level: '%5p [correlationId=%X{correlationId:-}]'
+
+identity:
+  session:
+    jwt-secret-base64: MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY=
+    issuer: http://localhost:8080
+    audience: truck-life-simulator-local
+  web:
+    allowed-origins:
+      - http://localhost:5173
+      - http://127.0.0.1:5173

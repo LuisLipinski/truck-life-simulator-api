@@ -92,13 +92,15 @@ O código está dividido por capacidade de negócio, não por camada global:
 
 A P2 começa pelo contrato de conta, senha, access/refresh token, rotação, revogação, CORS, CSRF e recuperação. Consulte [docs/identity-security.md](docs/identity-security.md) antes de alterar o módulo `identity` ou criar migrations relacionadas.
 
+O ciclo de sessão expõe `POST /api/v1/auth/login`, `POST /api/v1/auth/refresh` e `POST /api/v1/auth/logout`. O access token é um JWT curto; o refresh token opaco permanece em cookie `HttpOnly`, é persistido somente por hash e rotaciona a cada uso. Clientes web devem obter o token antifalsificação em `GET /api/v1/auth/csrf` antes de chamar refresh ou logout.
+
 ## Perfis
 
 | Perfil | Uso | Configuração sensível |
 | --- | --- | --- |
 | `local` | desenvolvimento com Compose | aceita padrões locais ou variáveis `DB_*` |
 | `test` | testes automatizados | conexão injetada pelo Testcontainers |
-| `prod` | ambiente publicado | exige `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` |
+| `prod` | ambiente publicado | exige banco, segredo/identidade JWT e origens CORS por variáveis de ambiente |
 
 O Hibernate usa `validate`; somente o Flyway altera o esquema.
 

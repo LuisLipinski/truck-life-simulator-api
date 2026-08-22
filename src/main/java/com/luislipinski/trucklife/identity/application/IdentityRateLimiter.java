@@ -49,6 +49,22 @@ public class IdentityRateLimiter {
         );
     }
 
+    public void checkLogin(String normalizedEmailHash, String clientAddress) {
+        IdentityProperties.Policy policy = properties.rateLimit().login();
+        check(Scope.LOGIN_IP, clientAddress, policy);
+        check(Scope.LOGIN_EMAIL, normalizedEmailHash, policy);
+    }
+
+    public void checkRefresh(String sessionFamilyId, String clientAddress) {
+        IdentityProperties.Policy policy = properties.rateLimit().refresh();
+        check(Scope.REFRESH_IP, clientAddress, policy);
+        check(Scope.REFRESH_SESSION, sessionFamilyId, policy);
+    }
+
+    public void checkUnknownRefresh(String clientAddress) {
+        check(Scope.REFRESH_IP, clientAddress, properties.rateLimit().refresh());
+    }
+
     private void check(Scope scope, String subject, IdentityProperties.Policy policy) {
         Instant now = clock.instant();
         AtomicReference<Decision> decision = new AtomicReference<>();
@@ -91,7 +107,11 @@ public class IdentityRateLimiter {
     private enum Scope {
         REGISTRATION,
         EMAIL_VERIFICATION,
-        RESEND_VERIFICATION
+        RESEND_VERIFICATION,
+        LOGIN_IP,
+        LOGIN_EMAIL,
+        REFRESH_IP,
+        REFRESH_SESSION
     }
 
     private record BucketKey(Scope scope, String subject) {
