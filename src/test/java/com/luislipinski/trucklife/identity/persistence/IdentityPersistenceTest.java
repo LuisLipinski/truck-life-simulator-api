@@ -8,7 +8,9 @@ import com.luislipinski.trucklife.identity.domain.UserRole;
 import com.luislipinski.trucklife.identity.domain.UserStatus;
 import jakarta.persistence.EntityManager;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.time.temporal.ChronoUnit;
+import java.util.Locale;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -254,14 +256,14 @@ class IdentityPersistenceTest {
                 """,
                 UUID.randomUUID(),
                 email,
-                email.toLowerCase(),
+                email.toLowerCase(Locale.ROOT),
                 PASSWORD_HASH,
                 "Test Driver",
                 status,
                 emailVerified,
-                emailVerifiedAt,
-                now,
-                now
+                emailVerifiedAt == null ? null : emailVerifiedAt.atOffset(ZoneOffset.UTC),
+                now.atOffset(ZoneOffset.UTC),
+                now.atOffset(ZoneOffset.UTC)
         );
     }
 }
