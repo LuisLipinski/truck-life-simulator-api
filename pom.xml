@@ -20,6 +20,7 @@
     <properties>
         <java.version>25</java.version>
         <archunit.version>1.5.0</archunit.version>
+        <bouncycastle.version>1.85.2</bouncycastle.version>
         <springdoc.version>3.1.0</springdoc.version>
         <testcontainers.version>2.0.5</testcontainers.version>
     </properties>
@@ -70,6 +71,15 @@
             <groupId>org.springdoc</groupId>
             <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
             <version>${springdoc.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>org.springframework.security</groupId>
+            <artifactId>spring-security-crypto</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.bouncycastle</groupId>
+            <artifactId>bcprov-jdk18on</artifactId>
+            <version>${bouncycastle.version}</version>
         </dependency>
 
         <dependency>

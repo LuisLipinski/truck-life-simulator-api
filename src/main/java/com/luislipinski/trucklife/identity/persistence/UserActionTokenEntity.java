@@ -96,4 +96,10 @@ public class UserActionTokenEntity {
     public Instant getCreatedAt() {
         return createdAt;
     }
+
+    public void markUsed(Instant usageTime) {
+        if (usedAt == null) {
+            usedAt = usageTime;
+        }
+    }
 }

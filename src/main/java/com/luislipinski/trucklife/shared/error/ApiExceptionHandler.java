@@ -12,6 +12,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -27,6 +28,34 @@ public class ApiExceptionHandler {
                 HttpStatus.NOT_FOUND,
                 exception.code(),
                 "Resource not found",
+                exception.getMessage(),
+                request
+        );
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    ResponseEntity<ProblemDetail> handleRateLimit(
+            RateLimitExceededException exception,
+            HttpServletRequest request
+    ) {
+        ProblemDetail problem = problem(
+                exception.status(),
+                exception.code(),
+                exception.title(),
+                exception.getMessage(),
+                request
+        );
+        return ResponseEntity.status(exception.status())
+                .header("Retry-After", Long.toString(exception.retryAfterSeconds()))
+                .body(problem);
+    }
+
+    @ExceptionHandler(ApiProblemException.class)
+    ProblemDetail handleApiProblem(ApiProblemException exception, HttpServletRequest request) {
+        return problem(
+                exception.status(),
+                exception.code(),
+                exception.title(),
                 exception.getMessage(),
                 request
         );
