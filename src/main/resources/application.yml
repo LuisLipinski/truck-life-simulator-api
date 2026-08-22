@@ -1,0 +1,50 @@
+spring:
+  application:
+    name: truck-life-simulator-api
+  profiles:
+    default: local
+  jackson:
+    default-property-inclusion: non_null
+    time-zone: UTC
+  jpa:
+    open-in-view: false
+  flyway:
+    enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
+
+server:
+  shutdown: graceful
+  error:
+    include-binding-errors: never
+    include-exception: false
+    include-message: never
+    include-stacktrace: never
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      probes:
+        enabled: true
+      show-details: never
+  info:
+    env:
+      enabled: true
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    operations-sorter: method
+    tags-sorter: alpha
+
+info:
+  app:
+    name: ${spring.application.name}
+    version: '@project.version@'
+    description: '@project.description@'
