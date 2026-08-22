@@ -13,6 +13,8 @@ import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "user_action_tokens")
@@ -33,7 +35,8 @@ public class UserActionTokenEntity {
     @Column(nullable = false, length = 30)
     private UserActionTokenPurpose purpose;
 
-    @Column(name = "token_hash", nullable = false, unique = true, columnDefinition = "CHAR(64)")
+    @JdbcTypeCode(SqlTypes.CHAR)
+    @Column(name = "token_hash", nullable = false, unique = true, length = 64)
     private String tokenHash;
 
     @Column(name = "expires_at", nullable = false)
