@@ -1,0 +1,14 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/truck_life}
+    username: ${DB_USERNAME:truck_life}
+    password: ${DB_PASSWORD:truck_life}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    clean-disabled: true
+
+logging:
+  pattern:
+    level: '%5p [correlationId=%X{correlationId:-}]'
