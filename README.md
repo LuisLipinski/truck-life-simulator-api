@@ -48,6 +48,8 @@ docker compose down
 
 O volume é preservado. Use `docker compose down --volumes` apenas quando quiser apagar intencionalmente os dados locais.
 
+No PostgreSQL 18, a imagem oficial armazena os dados persistentes em `/var/lib/postgresql`; o `compose.yml` já usa esse novo destino.
+
 ## Validar
 
 ```bash
