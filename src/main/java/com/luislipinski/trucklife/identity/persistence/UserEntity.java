@@ -131,4 +131,17 @@ public class UserEntity {
     public Instant getLastLoginAt() {
         return lastLoginAt;
     }
+
+    public void verifyEmail(Instant verifiedAt) {
+        if (emailVerified) {
+            return;
+        }
+
+        emailVerified = true;
+        emailVerifiedAt = verifiedAt;
+        updatedAt = verifiedAt;
+        if (status == UserStatus.PENDING_VERIFICATION) {
+            status = UserStatus.ACTIVE;
+        }
+    }
 }
