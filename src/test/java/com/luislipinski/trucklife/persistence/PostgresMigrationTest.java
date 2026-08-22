@@ -24,7 +24,7 @@ class PostgresMigrationTest {
     @Container
     @ServiceConnection
     static final PostgreSQLContainer<?> POSTGRES = new PostgreSQLContainer<>(
-            DockerImageName.parse("postgres:17-alpine")
+            DockerImageName.parse("postgres:18-alpine")
     );
 
     @Autowired

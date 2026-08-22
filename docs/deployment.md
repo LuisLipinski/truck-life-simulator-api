@@ -16,17 +16,39 @@ A aplicação é distribuída como imagem OCI e deve ser executada com o perfil 
 
 O PostgreSQL deve estar acessível antes do start. O Flyway aplica migrações aditivas automaticamente e o Hibernate somente valida o resultado.
 
+## Primeiro ambiente: Render + Neon
+
+O primeiro ambiente de desenvolvimento usa:
+
+- Render Web Service com runtime Docker e branch `development`;
+- Neon com PostgreSQL 18;
+- região AWS US East 2 (Ohio) nos dois serviços;
+- health check em `/actuator/health/readiness`.
+
+No Neon, use a conexão direta, sem o sufixo `-pooler` no host. A aplicação executa o Flyway durante a inicialização e o Neon recomenda conexão direta para ferramentas de migração de esquema. A conexão deve usar TLS.
+
+Cadastre no Render:
+
+```text
+SPRING_PROFILES_ACTIVE=prod
+DB_URL=jdbc:postgresql://<host-direto-do-neon>/<banco>?sslmode=require
+DB_USERNAME=<role-do-neon>
+DB_PASSWORD=<senha-do-neon>
+```
+
+Não cadastre `PORT`: o Render fornece esse valor e a aplicação o utiliza automaticamente. Credenciais reais pertencem somente aos segredos do Render e nunca devem ser adicionadas ao repositório.
+
 ## Publicação
 
 1. Aguarde o workflow `Backend CI` verde para o commit candidato.
-2. Construa a imagem usando o SHA do commit como tag imutável.
-3. Publique a imagem no registry escolhido.
-4. Aponte o ambiente para essa tag e forneça as variáveis de produção.
+2. Confirme que o Render está acompanhando a branch `development` com runtime Docker.
+3. Forneça as variáveis de produção como segredos do serviço.
+4. Aguarde o Render construir o `Dockerfile` e iniciar a revisão correspondente ao SHA do commit.
 5. Aguarde `GET /actuator/health/readiness` responder `200` e `UP`.
 6. Execute smoke tests em `/api/v1/platform` e `/v3/api-docs`.
-7. Registre SHA, tag de imagem e versão do Flyway na entrega.
+7. Registre SHA, identificador do deploy e versão do Flyway na entrega.
 
-O provedor e o registry permanecem uma decisão operacional separada; a fundação não prende o projeto a um fornecedor.
+A imagem permanece independente do provedor. Render e Neon são o primeiro ambiente escolhido, mas a aplicação continua portável para qualquer plataforma compatível com contêiner e PostgreSQL.
 
 ## Rollback
 
@@ -40,4 +62,4 @@ Migrações destrutivas exigirão uma estratégia expand/contract em fases futur
 
 ## Critério para o primeiro ambiente
 
-O deploy é aceito apenas quando a API inicia com o perfil `prod`, conecta ao PostgreSQL, conclui o Flyway, responde ao readiness e passa nos dois smoke tests. Até que um provedor seja selecionado e esses passos sejam executados, esta documentação representa a preparação do deploy, não uma publicação concluída.
+O deploy é aceito apenas quando a API inicia com o perfil `prod`, conecta ao PostgreSQL 18 no Neon, conclui o Flyway, responde ao readiness e passa nos dois smoke tests. Até que o serviço e o banco sejam criados e esses passos sejam executados, esta documentação representa a preparação do deploy, não uma publicação concluída.

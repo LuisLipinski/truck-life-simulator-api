@@ -17,6 +17,6 @@ USER spring:spring
 EXPOSE 8080
 
 HEALTHCHECK --interval=30s --timeout=3s --start-period=30s --retries=3 \
-  CMD wget -qO- http://127.0.0.1:8080/actuator/health/readiness || exit 1
+  CMD wget -qO- "http://127.0.0.1:${PORT:-8080}/actuator/health/readiness" || exit 1
 
 ENTRYPOINT ["java", "-XX:MaxRAMPercentage=75.0", "-jar", "/app/app.jar"]

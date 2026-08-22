@@ -7,9 +7,9 @@ Esta entrega inaugura a P1: a fundação técnica do backend. Ela define os limi
 ## Stack
 
 - Java 25 LTS
-- Spring Boot 4.1
+- Spring Boot 4.1.1
 - Maven 3.9+
-- PostgreSQL 17
+- PostgreSQL 18
 - Flyway
 - OpenAPI/Swagger UI
 - JUnit 6, MockMvc, RestTestClient, ArchUnit e Testcontainers
@@ -95,6 +95,8 @@ O código está dividido por capacidade de negócio, não por camada global:
 | `prod` | ambiente publicado | exige `DB_URL`, `DB_USERNAME` e `DB_PASSWORD` |
 
 O Hibernate usa `validate`; somente o Flyway altera o esquema.
+
+Use [`.env.example`](.env.example) somente como referência para os nomes das variáveis. O arquivo `.env` real e as credenciais do Neon não devem ser versionados; no Render, cadastre os valores como segredos do serviço.
 
 ## Branches e integração
 
