@@ -1,7 +1,9 @@
 package com.luislipinski.trucklife.identity.config;
 
-import java.util.List;
+import com.luislipinski.trucklife.identity.application.JwtAccessTokenIssuer;
+import com.luislipinski.trucklife.identity.persistence.UserRepository;
 import com.luislipinski.trucklife.shared.error.ApiSecurityProblemWriter;
+import java.util.List;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -53,6 +55,22 @@ public class IdentityWebConfiguration {
                 new CorsFilter(source)
         );
         registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 2);
+        return registration;
+    }
+
+    @Bean
+    FilterRegistrationBean<AccessTokenAuthenticationFilter> accessTokenAuthenticationFilter(
+            JwtAccessTokenIssuer accessTokenIssuer,
+            UserRepository userRepository,
+            ApiSecurityProblemWriter problemWriter
+    ) {
+        FilterRegistrationBean<AccessTokenAuthenticationFilter> registration =
+                new FilterRegistrationBean<>(new AccessTokenAuthenticationFilter(
+                        accessTokenIssuer,
+                        userRepository,
+                        problemWriter
+                ));
+        registration.setOrder(Ordered.HIGHEST_PRECEDENCE + 3);
         return registration;
     }
 }
