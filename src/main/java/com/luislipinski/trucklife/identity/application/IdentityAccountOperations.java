@@ -8,7 +8,11 @@ public interface IdentityAccountOperations {
 
     void resendVerification(String email, String clientAddress);
 
-    void forgotPassword(String email, String clientAddress);
+    default void forgotPassword(String email, String clientAddress) {
+        throw new UnsupportedOperationException("Password recovery is not implemented");
+    }
 
-    void resetPassword(String rawToken, String newRawPassword, String clientAddress);
+    default void resetPassword(String rawToken, String newRawPassword, String clientAddress) {
+        throw new UnsupportedOperationException("Password recovery is not implemented");
+    }
 }
