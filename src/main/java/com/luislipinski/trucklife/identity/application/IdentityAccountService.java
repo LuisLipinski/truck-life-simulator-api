@@ -17,12 +17,7 @@ public class IdentityAccountService implements IdentityAccountOperations {
     private final VerificationEmailDeliveryPort emailDelivery;
     private final PasswordEncoder passwordEncoder;
 
-    public IdentityAccountService(
-            IdentityAccountWriter accountWriter,
-            IdentityRateLimiter rateLimiter,
-            VerificationEmailDeliveryPort emailDelivery,
-            PasswordEncoder passwordEncoder
-    ) {
+    public IdentityAccountService(IdentityAccountWriter accountWriter, IdentityRateLimiter rateLimiter, VerificationEmailDeliveryPort emailDelivery, PasswordEncoder passwordEncoder) {
         this.accountWriter = accountWriter;
         this.rateLimiter = rateLimiter;
         this.emailDelivery = emailDelivery;
@@ -30,30 +25,17 @@ public class IdentityAccountService implements IdentityAccountOperations {
     }
 
     @Override
-    public void register(
-            String email,
-            String displayName,
-            String rawPassword,
-            String clientAddress
-    ) {
+    public void register(String email, String displayName, String rawPassword, String clientAddress) {
         rateLimiter.checkRegistration(safeClientAddress(clientAddress));
         String trimmedEmail = email.strip();
         String normalizedEmail = normalizeEmail(trimmedEmail);
         String passwordHash = passwordEncoder.encode(rawPassword);
-
         try {
-            accountWriter.createPendingAccount(
-                    trimmedEmail,
-                    normalizedEmail,
-                    displayName.strip(),
-                    passwordHash
-            ).ifPresent(this::deliver);
+            accountWriter.createPendingAccount(trimmedEmail, normalizedEmail, displayName.strip(), passwordHash).ifPresent(this::deliverVerification);
         } catch (DataIntegrityViolationException exception) {
             if (!isUniqueViolation(exception)) {
                 throw exception;
             }
-            // A concurrent request created the same normalized e-mail first.
-            // Preserve the neutral registration response.
         }
     }
 
@@ -68,20 +50,30 @@ public class IdentityAccountService implements IdentityAccountOperations {
     public void resendVerification(String email, String clientAddress) {
         String normalizedEmail = normalizeEmail(email);
         String normalizedEmailHash = TokenDigests.sha256(normalizedEmail);
-        rateLimiter.checkResendVerification(
-                normalizedEmailHash,
-                safeClientAddress(clientAddress)
-        );
-        accountWriter.resendVerification(normalizedEmail).ifPresent(this::deliver);
+        rateLimiter.checkResendVerification(normalizedEmailHash, safeClientAddress(clientAddress));
+        accountWriter.resendVerification(normalizedEmail).ifPresent(this::deliverVerification);
     }
 
-    private void deliver(PendingVerificationDelivery delivery) {
-        emailDelivery.sendVerificationEmail(
-                delivery.recipient(),
-                delivery.displayName(),
-                delivery.rawToken(),
-                delivery.expiresAt()
-        );
+    @Override
+    public void forgotPassword(String email, String clientAddress) {
+        String normalizedEmail = normalizeEmail(email);
+        rateLimiter.checkResendVerification(TokenDigests.sha256(normalizedEmail), safeClientAddress(clientAddress));
+        accountWriter.requestPasswordReset(normalizedEmail).ifPresent(this::deliverPasswordReset);
+    }
+
+    @Override
+    public void resetPassword(String rawToken, String newRawPassword, String clientAddress) {
+        String tokenHash = TokenDigests.sha256(rawToken);
+        rateLimiter.checkEmailVerification(tokenHash, safeClientAddress(clientAddress));
+        accountWriter.resetPassword(tokenHash, passwordEncoder.encode(newRawPassword));
+    }
+
+    private void deliverVerification(PendingVerificationDelivery delivery) {
+        emailDelivery.sendVerificationEmail(delivery.recipient(), delivery.displayName(), delivery.rawToken(), delivery.expiresAt());
+    }
+
+    private void deliverPasswordReset(PendingPasswordResetDelivery delivery) {
+        emailDelivery.sendPasswordResetEmail(delivery.recipient(), delivery.displayName(), delivery.rawToken(), delivery.expiresAt());
     }
 
     private String normalizeEmail(String email) {
@@ -89,16 +81,13 @@ public class IdentityAccountService implements IdentityAccountOperations {
     }
 
     private String safeClientAddress(String clientAddress) {
-        return clientAddress == null || clientAddress.isBlank()
-                ? "unknown"
-                : clientAddress;
+        return clientAddress == null || clientAddress.isBlank() ? "unknown" : clientAddress;
     }
 
     private boolean isUniqueViolation(Throwable throwable) {
         Throwable current = throwable;
         while (current != null) {
-            if (current instanceof SQLException sqlException
-                    && UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
+            if (current instanceof SQLException sqlException && UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())) {
                 return true;
             }
             current = current.getCause();
