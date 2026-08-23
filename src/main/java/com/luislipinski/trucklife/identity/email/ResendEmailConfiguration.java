@@ -14,8 +14,8 @@ import org.springframework.web.client.RestClient;
 public class ResendEmailConfiguration {
 
     @Bean("resendRestClient")
-    RestClient resendRestClient(RestClient.Builder builder, ResendEmailProperties properties) {
-        return builder
+    RestClient resendRestClient(ResendEmailProperties properties) {
+        return RestClient.builder()
                 .baseUrl("https://api.resend.com")
                 .defaultHeader(
                         HttpHeaders.AUTHORIZATION,
