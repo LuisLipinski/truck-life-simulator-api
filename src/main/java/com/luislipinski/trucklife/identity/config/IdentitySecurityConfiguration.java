@@ -6,6 +6,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.boot.context.properties.EnableConfigurationProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -30,6 +31,12 @@ public class IdentitySecurityConfiguration {
 
     @Bean
     @ConditionalOnMissingBean(VerificationEmailDeliveryPort.class)
+    @ConditionalOnProperty(
+            prefix = "identity.email",
+            name = "provider",
+            havingValue = "discard",
+            matchIfMissing = true
+    )
     VerificationEmailDeliveryPort verificationEmailDeliveryPort() { return new DiscardingVerificationEmailAdapter(); }
 
     private static final class DiscardingVerificationEmailAdapter implements VerificationEmailDeliveryPort {
