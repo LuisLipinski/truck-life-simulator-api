@@ -45,6 +45,13 @@ springdoc:
 
 identity:
   email-verification-ttl: ${AUTH_EMAIL_VERIFICATION_TTL:PT24H}
+  email:
+    provider: ${AUTH_EMAIL_PROVIDER:discard}
+    resend-api-key: ${RESEND_API_KEY:}
+    from: ${AUTH_EMAIL_FROM:Truck Life Simulator <onboarding@resend.dev>}
+    frontend-base-url: ${AUTH_FRONTEND_BASE_URL:https://luislipinski.github.io/truck-life-simulator}
+    test-mode: ${AUTH_EMAIL_TEST_MODE:true}
+    test-recipient: ${AUTH_EMAIL_TEST_RECIPIENT:delivered@resend.dev}
   session:
     access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:PT10M}
     refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:P30D}
