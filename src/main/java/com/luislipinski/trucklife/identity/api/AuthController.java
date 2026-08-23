@@ -20,113 +20,47 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping(path = "/api/v1/auth")
-@Tag(name = "Identity", description = "Account registration and e-mail verification")
+@Tag(name = "Identity", description = "Account registration, verification and recovery")
 public class AuthController {
-
     private final IdentityAccountOperations accountService;
+    public AuthController(IdentityAccountOperations accountService) { this.accountService = accountService; }
 
-    public AuthController(IdentityAccountOperations accountService) {
-        this.accountService = accountService;
-    }
-
-    @PostMapping(
-            path = "/register",
-            consumes = MediaType.APPLICATION_JSON_VALUE
-    )
+    @PostMapping(path = "/register", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
     @Operation(summary = "Register a pending account")
-    @ApiResponses({
-            @ApiResponse(responseCode = "202", description = "Registration request accepted"),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid registration data",
-                    content = @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "429",
-                    description = "Registration rate limit exceeded",
-                    content = @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
-                    )
-            )
-    })
-    public void register(
-            @Valid @RequestBody RegistrationRequest request,
-            HttpServletRequest servletRequest
-    ) {
-        accountService.register(
-                request.email(),
-                request.displayName(),
-                request.password(),
-                servletRequest.getRemoteAddr()
-        );
+    @ApiResponses({@ApiResponse(responseCode = "202", description = "Registration request accepted"), @ApiResponse(responseCode = "400", description = "Invalid registration data", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class))), @ApiResponse(responseCode = "429", description = "Registration rate limit exceeded", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class)))})
+    public void register(@Valid @RequestBody RegistrationRequest request, HttpServletRequest servletRequest) {
+        accountService.register(request.email(), request.displayName(), request.password(), servletRequest.getRemoteAddr());
     }
 
-    @PostMapping(
-            path = "/verify-email",
-            consumes = MediaType.APPLICATION_JSON_VALUE
-    )
+    @PostMapping(path = "/verify-email", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.NO_CONTENT)
     @Operation(summary = "Verify an e-mail address with a one-time token")
-    @ApiResponses({
-            @ApiResponse(responseCode = "204", description = "E-mail verified or already verified"),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid or expired verification token",
-                    content = @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "429",
-                    description = "Verification rate limit exceeded",
-                    content = @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
-                    )
-            )
-    })
-    public void verifyEmail(
-            @Valid @RequestBody VerificationTokenRequest request,
-            HttpServletRequest servletRequest
-    ) {
+    @ApiResponses({@ApiResponse(responseCode = "204", description = "E-mail verified or already verified"), @ApiResponse(responseCode = "400", description = "Invalid or expired verification token", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class))), @ApiResponse(responseCode = "429", description = "Verification rate limit exceeded", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class)))})
+    public void verifyEmail(@Valid @RequestBody VerificationTokenRequest request, HttpServletRequest servletRequest) {
         accountService.verifyEmail(request.token(), servletRequest.getRemoteAddr());
     }
 
-    @PostMapping(
-            path = "/resend-verification",
-            consumes = MediaType.APPLICATION_JSON_VALUE
-    )
+    @PostMapping(path = "/resend-verification", consumes = MediaType.APPLICATION_JSON_VALUE)
     @ResponseStatus(HttpStatus.ACCEPTED)
     @Operation(summary = "Request another e-mail verification message")
-    @ApiResponses({
-            @ApiResponse(responseCode = "202", description = "Resend request accepted"),
-            @ApiResponse(
-                    responseCode = "400",
-                    description = "Invalid request data",
-                    content = @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
-                    )
-            ),
-            @ApiResponse(
-                    responseCode = "429",
-                    description = "Resend rate limit exceeded",
-                    content = @Content(
-                            mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
-                            schema = @Schema(implementation = ProblemDetail.class)
-                    )
-            )
-    })
-    public void resendVerification(
-            @Valid @RequestBody ResendVerificationRequest request,
-            HttpServletRequest servletRequest
-    ) {
+    public void resendVerification(@Valid @RequestBody ResendVerificationRequest request, HttpServletRequest servletRequest) {
         accountService.resendVerification(request.email(), servletRequest.getRemoteAddr());
+    }
+
+    @PostMapping(path = "/forgot-password", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.ACCEPTED)
+    @Operation(summary = "Request a password reset without revealing account existence")
+    @ApiResponses({@ApiResponse(responseCode = "202", description = "Password reset request accepted"), @ApiResponse(responseCode = "400", description = "Invalid request data", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class))), @ApiResponse(responseCode = "429", description = "Password reset request rate limit exceeded", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class)))})
+    public void forgotPassword(@Valid @RequestBody ForgotPasswordRequest request, HttpServletRequest servletRequest) {
+        accountService.forgotPassword(request.email(), servletRequest.getRemoteAddr());
+    }
+
+    @PostMapping(path = "/reset-password", consumes = MediaType.APPLICATION_JSON_VALUE)
+    @ResponseStatus(HttpStatus.NO_CONTENT)
+    @Operation(summary = "Set a new password with a one-time reset token")
+    @ApiResponses({@ApiResponse(responseCode = "204", description = "Password reset completed"), @ApiResponse(responseCode = "400", description = "Invalid, expired or used reset token", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class))), @ApiResponse(responseCode = "429", description = "Password reset rate limit exceeded", content = @Content(mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE, schema = @Schema(implementation = ProblemDetail.class)))})
+    public void resetPassword(@Valid @RequestBody ResetPasswordRequest request, HttpServletRequest servletRequest) {
+        accountService.resetPassword(request.token(), request.newPassword(), servletRequest.getRemoteAddr());
     }
 }
