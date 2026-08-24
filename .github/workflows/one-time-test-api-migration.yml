@@ -1,15 +1,16 @@
 name: One-time deprecated test API migration
 
 on:
-  push:
+  pull_request:
     branches:
-      - chore/backend-hardening-next
+      - development
 
 permissions:
   contents: write
 
 jobs:
   migrate:
+    if: github.head_ref == 'chore/backend-hardening-next'
     runs-on: ubuntu-latest
 
     steps:
@@ -47,5 +48,3 @@ jobs:
 
           git commit -m 'test: migrate deprecated test APIs'
           git push origin HEAD:chore/backend-hardening-next
-
-# Triggered after the workflow existed on the branch.
