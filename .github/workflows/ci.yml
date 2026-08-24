@@ -53,7 +53,7 @@ jobs:
               ("Branches", "BRANCH_MISSED", "BRANCH_COVERED"),
               ("Lines", "LINE_MISSED", "LINE_COVERED"),
               ("Methods", "METHOD_MISSED", "METHOD_COVERED"),
-              ("Classes", "CLASS_MISSED", "CLASS_COVERED"),
+              ("Complexity", "COMPLEXITY_MISSED", "COMPLEXITY_COVERED"),
           ]
 
           lines = ["## JaCoCo coverage", "", "| Metric | Covered | Missed | Coverage |", "| --- | ---: | ---: | ---: |"]
