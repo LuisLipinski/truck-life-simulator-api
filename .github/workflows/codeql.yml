@@ -46,7 +46,7 @@ jobs:
           build-mode: manual
 
       - name: Build application for analysis
-        run: mvn -B -ntp -DskipTests package
+        run: sh ./mvnw -B -ntp -DskipTests package
 
       - name: Perform CodeQL analysis
         uses: github/codeql-action/analyze@v4
