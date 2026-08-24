@@ -62,6 +62,30 @@ O segredo JWT deve ser gerado a partir de pelo menos 32 bytes aleatórios. Nunca
 
 A imagem permanece independente do provedor. Render e Neon são o primeiro ambiente escolhido, mas a aplicação continua portável para qualquer plataforma compatível com contêiner e PostgreSQL.
 
+## Logging seguro
+
+As requisições da API geram um registro de conclusão contendo somente metadados operacionais seguros:
+
+```text
+http_request event=AUTH_LOGIN method=POST path=/api/v1/auth/login status=200 outcome=SUCCESS durationMs=42 correlationId=<id>
+```
+
+Os eventos conhecidos incluem cadastro, verificação e reenvio de e-mail, login, refresh, logout, recuperação e redefinição de senha, CSRF, Minha Conta e status da plataforma. Demais rotas usam `API_REQUEST`.
+
+O logging de requisições não registra query string, corpo da requisição, cabeçalhos, cookies, endereço de e-mail, senha ou valores de token. Portanto, nunca devem aparecer nos logs:
+
+- `Authorization` ou access token JWT;
+- refresh token ou cookie `TLS_REFRESH_TOKEN`;
+- cookie ou valor de CSRF;
+- senha atual ou nova senha;
+- token de verificação de e-mail;
+- token de redefinição de senha;
+- `RESEND_API_KEY`, credenciais do PostgreSQL ou demais segredos de ambiente.
+
+Respostas `4xx` são registradas como `REJECTED`, `5xx` como `ERROR` e demais respostas como `SUCCESS`. Requisições fora de `/api/`, incluindo probes do Actuator, não entram nesse log para evitar ruído operacional. Erros inesperados registram apenas o tipo da exceção e o `correlationId`, sem mensagem ou stack trace potencialmente sensíveis.
+
+Durante a validação de um deploy, execute um fluxo de login, refresh e logout e confira no Render que os eventos aparecem com método, rota, status, duração e `correlationId`, sem qualquer um dos dados proibidos acima.
+
 ## Rollback
 
 1. Interrompa novas promoções e identifique a última tag de imagem saudável.
