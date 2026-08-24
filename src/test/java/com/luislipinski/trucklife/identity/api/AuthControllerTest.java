@@ -81,6 +81,20 @@ class AuthControllerTest {
     }
 
     @Test
+    void mapsUnsupportedMediaTypeToProblemDetails() throws Exception {
+        mockMvc.perform(post("/api/v1/auth/register")
+                        .header(CorrelationIdFilter.HEADER_NAME, "unsupported-media-request")
+                        .contentType(MediaType.TEXT_PLAIN)
+                        .content("not-json"))
+                .andExpect(status().isUnsupportedMediaType())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(415))
+                .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"))
+                .andExpect(jsonPath("$.title").value("Unsupported media type"))
+                .andExpect(jsonPath("$.correlationId").value("unsupported-media-request"));
+    }
+
+    @Test
     void mapsRateLimitToProblemDetailsAndRetryAfter() throws Exception {
         accountService.failWith(new RateLimitExceededException(42));
 
