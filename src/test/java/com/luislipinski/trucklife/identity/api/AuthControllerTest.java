@@ -132,6 +132,16 @@ class AuthControllerTest {
             throwIfConfigured();
         }
 
+        @Override
+        public void forgotPassword(String email, String clientAddress) {
+            throwIfConfigured();
+        }
+
+        @Override
+        public void resetPassword(String rawToken, String newRawPassword, String clientAddress) {
+            throwIfConfigured();
+        }
+
         RegistrationCall registration() {
             return registration;
         }
