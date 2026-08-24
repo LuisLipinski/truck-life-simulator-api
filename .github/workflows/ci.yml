@@ -38,6 +38,45 @@ jobs:
       - name: Compile, test and package
         run: mvn -B -ntp verify
 
+      - name: Publish coverage summary
+        shell: bash
+        run: |
+          python - <<'PY'
+          import csv
+          import os
+          from pathlib import Path
+
+          report = Path("target/site/jacoco/jacoco.csv")
+          rows = list(csv.DictReader(report.open(encoding="utf-8")))
+          counters = [
+              ("Instructions", "INSTRUCTION_MISSED", "INSTRUCTION_COVERED"),
+              ("Branches", "BRANCH_MISSED", "BRANCH_COVERED"),
+              ("Lines", "LINE_MISSED", "LINE_COVERED"),
+              ("Methods", "METHOD_MISSED", "METHOD_COVERED"),
+              ("Classes", "CLASS_MISSED", "CLASS_COVERED"),
+          ]
+
+          lines = ["## JaCoCo coverage", "", "| Metric | Covered | Missed | Coverage |", "| --- | ---: | ---: | ---: |"]
+          for label, missed_key, covered_key in counters:
+              missed = sum(int(row[missed_key]) for row in rows)
+              covered = sum(int(row[covered_key]) for row in rows)
+              total = missed + covered
+              percentage = (covered / total * 100) if total else 100.0
+              lines.append(f"| {label} | {covered} | {missed} | {percentage:.2f}% |")
+              print(f"{label}: {percentage:.2f}% ({covered}/{total})")
+
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write("\n".join(lines) + "\n")
+          PY
+
+      - name: Upload JaCoCo coverage report
+        uses: actions/upload-artifact@v7
+        with:
+          name: jacoco-coverage-report
+          path: target/site/jacoco/
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Upload application artifact
         uses: actions/upload-artifact@v7
         with:
