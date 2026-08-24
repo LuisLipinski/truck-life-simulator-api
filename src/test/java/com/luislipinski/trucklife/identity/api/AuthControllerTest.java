@@ -1,6 +1,7 @@
 package com.luislipinski.trucklife.identity.api;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
@@ -92,6 +93,30 @@ class AuthControllerTest {
                 .andExpect(jsonPath("$.code").value("UNSUPPORTED_MEDIA_TYPE"))
                 .andExpect(jsonPath("$.title").value("Unsupported media type"))
                 .andExpect(jsonPath("$.correlationId").value("unsupported-media-request"));
+    }
+
+    @Test
+    void mapsUnsupportedMethodToProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/v1/auth/register")
+                        .header(CorrelationIdFilter.HEADER_NAME, "method-not-allowed-request"))
+                .andExpect(status().isMethodNotAllowed())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(405))
+                .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"))
+                .andExpect(jsonPath("$.title").value("Method not allowed"))
+                .andExpect(jsonPath("$.correlationId").value("method-not-allowed-request"));
+    }
+
+    @Test
+    void mapsUnknownEndpointToProblemDetails() throws Exception {
+        mockMvc.perform(get("/api/v1/route-that-does-not-exist")
+                        .header(CorrelationIdFilter.HEADER_NAME, "endpoint-not-found-request"))
+                .andExpect(status().isNotFound())
+                .andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.code").value("ENDPOINT_NOT_FOUND"))
+                .andExpect(jsonPath("$.title").value("Endpoint not found"))
+                .andExpect(jsonPath("$.correlationId").value("endpoint-not-found-request"));
     }
 
     @Test
