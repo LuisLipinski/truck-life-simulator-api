@@ -35,8 +35,11 @@ jobs:
           java-version: '25'
           cache: maven
 
+      - name: Verify Maven Wrapper
+        run: sh ./mvnw --version
+
       - name: Compile, test and package
-        run: mvn -B -ntp verify
+        run: sh ./mvnw -B -ntp verify
 
       - name: Publish coverage summary
         shell: bash
