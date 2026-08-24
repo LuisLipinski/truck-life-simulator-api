@@ -47,3 +47,5 @@ jobs:
 
           git commit -m 'test: migrate deprecated test APIs'
           git push origin HEAD:chore/backend-hardening-next
+
+# Triggered after the workflow existed on the branch.
