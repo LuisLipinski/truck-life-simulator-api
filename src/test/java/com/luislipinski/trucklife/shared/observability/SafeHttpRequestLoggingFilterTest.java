@@ -1,11 +1,13 @@
 package com.luislipinski.trucklife.shared.observability;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.http.Cookie;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.AfterEach;
@@ -70,6 +72,33 @@ class SafeHttpRequestLoggingFilterTest {
                 .doesNotContain("cookie-secret")
                 .doesNotContain("password-secret")
                 .doesNotContain("driver@example.com");
+    }
+
+    @Test
+    void logsUnhandledApiFailuresAsServerErrorsAndRethrows() {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/unknown");
+        request.setAttribute(CorrelationIdFilter.REQUEST_ATTRIBUTE, "corr-error");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+
+        assertThatThrownBy(() -> filter.doFilter(
+                request,
+                response,
+                (servletRequest, servletResponse) -> {
+                    throw new ServletException("boom");
+                }
+        )).isInstanceOf(ServletException.class)
+                .hasMessage("boom");
+
+        assertThat(appender.list).hasSize(1);
+        ILoggingEvent event = appender.list.get(0);
+        assertThat(event.getLevel()).isEqualTo(Level.ERROR);
+        assertThat(event.getFormattedMessage())
+                .contains("event=API_REQUEST")
+                .contains("method=GET")
+                .contains("path=/api/v1/unknown")
+                .contains("status=500")
+                .contains("outcome=ERROR")
+                .contains("correlationId=corr-error");
     }
 
     @Test
