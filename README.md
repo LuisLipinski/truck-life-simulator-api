@@ -8,22 +8,25 @@ A fundação técnica da P1 está concluída e o backend evolui atualmente pela 
 
 - Java 25 LTS
 - Spring Boot 4.1.1
-- Maven 3.9+
+- Maven 3.9.16 via Maven Wrapper 3.3.4
 - PostgreSQL 18
 - Flyway
 - OpenAPI/Swagger UI
 - JUnit 6, MockMvc, RestTestClient, ArchUnit e Testcontainers
 - JaCoCo
 - Docker/OCI e GitHub Actions
+- CodeQL e Dependency Review
 
 ## Executar localmente
 
-Pré-requisitos: JDK 25, Maven 3.9+ e Docker com Compose.
+Pré-requisitos: JDK 25 e Docker com Compose. Não é necessário instalar Maven separadamente: o repositório fixa a versão usada por meio do Maven Wrapper.
 
 ```bash
 docker compose up -d postgres
-mvn spring-boot:run
+./mvnw spring-boot:run
 ```
+
+No Windows, use `mvnw.cmd spring-boot:run`.
 
 A aplicação usa o perfil `local` por padrão. Os valores locais seguros para desenvolvimento estão em `application-local.yml` e podem ser sobrescritos:
 
@@ -54,8 +57,10 @@ No PostgreSQL 18, a imagem oficial armazena os dados persistentes em `/var/lib/p
 ## Validar
 
 ```bash
-mvn verify
+./mvnw verify
 ```
+
+No Windows, use `mvnw.cmd verify`.
 
 A validação requer Docker porque os testes de integração criam instâncias PostgreSQL descartáveis. A suíte verifica, entre outros pontos:
 
@@ -133,7 +138,9 @@ Use [`.env.example`](.env.example) somente como referência para os nomes das va
 - `development`: ambiente integrado usado para validação funcional;
 - `feature/*`, `fix/*` e `hotfix/*`: mudanças isoladas, integradas por pull request em `development` após CI verde.
 
-O workflow `.github/workflows/ci.yml` executa testes, verifica o gate de cobertura, empacota o JAR, publica o relatório JaCoCo como artefato e valida a construção da imagem OCI em pull requests e pushes de `development` e `master`.
+O workflow `.github/workflows/ci.yml` executa o build pelo Maven Wrapper, roda testes, verifica o gate de cobertura, empacota o JAR, publica o relatório JaCoCo como artefato e valida a construção da imagem OCI em pull requests e pushes de `development` e `master`.
+
+O CodeQL executa análise estática de segurança e o Dependency Review analisa alterações de dependências em pull requests. Para que o Dependency Review opere, o `Dependency graph` do repositório deve permanecer habilitado nas configurações de segurança do GitHub.
 
 ## Deploy e rollback
 
