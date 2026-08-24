@@ -8,21 +8,31 @@ A fundação técnica da P1 está concluída e o backend evolui atualmente pela 
 
 - Java 25 LTS
 - Spring Boot 4.1.1
-- Maven 3.9+
+- Maven 3.9.16 via Maven Wrapper
 - PostgreSQL 18
 - Flyway
 - OpenAPI/Swagger UI
 - JUnit 6, MockMvc, RestTestClient, ArchUnit e Testcontainers
 - JaCoCo
 - Docker/OCI e GitHub Actions
+- CodeQL, Dependency Review e Dependabot
 
 ## Executar localmente
 
-Pré-requisitos: JDK 25, Maven 3.9+ e Docker com Compose.
+Pré-requisitos: JDK 25 e Docker com Compose. O Maven não precisa estar instalado globalmente porque o repositório fixa a versão utilizada pelo Maven Wrapper.
+
+Linux/macOS:
 
 ```bash
 docker compose up -d postgres
-mvn spring-boot:run
+sh ./mvnw spring-boot:run
+```
+
+Windows:
+
+```powershell
+docker compose up -d postgres
+.\mvnw.cmd spring-boot:run
 ```
 
 A aplicação usa o perfil `local` por padrão. Os valores locais seguros para desenvolvimento estão em `application-local.yml` e podem ser sobrescritos:
@@ -53,8 +63,16 @@ No PostgreSQL 18, a imagem oficial armazena os dados persistentes em `/var/lib/p
 
 ## Validar
 
+Linux/macOS:
+
 ```bash
-mvn verify
+sh ./mvnw verify
+```
+
+Windows:
+
+```powershell
+.\mvnw.cmd verify
 ```
 
 A validação requer Docker porque os testes de integração criam instâncias PostgreSQL descartáveis. A suíte verifica, entre outros pontos:
@@ -133,7 +151,9 @@ Use [`.env.example`](.env.example) somente como referência para os nomes das va
 - `development`: ambiente integrado usado para validação funcional;
 - `feature/*`, `fix/*` e `hotfix/*`: mudanças isoladas, integradas por pull request em `development` após CI verde.
 
-O workflow `.github/workflows/ci.yml` executa testes, verifica o gate de cobertura, empacota o JAR, publica o relatório JaCoCo como artefato e valida a construção da imagem OCI em pull requests e pushes de `development` e `master`.
+O workflow `.github/workflows/ci.yml` usa o Maven Wrapper, executa testes, verifica o gate de cobertura, empacota o JAR, publica o relatório JaCoCo como artefato e valida a construção da imagem OCI em pull requests e pushes de `development` e `master`.
+
+O workflow `.github/workflows/security.yml` executa análise CodeQL e revisa mudanças de dependências. O Dependency Review depende do **Dependency Graph** habilitado nas configurações de segurança do repositório. O Dependabot abre atualizações periódicas contra `development`, que continuam sujeitas à CI e aos gates de qualidade antes de qualquer integração.
 
 ## Deploy e rollback
 
