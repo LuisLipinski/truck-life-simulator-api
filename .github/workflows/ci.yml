@@ -14,18 +14,13 @@ on:
 permissions:
   contents: read
 
-concurrency:
-  group: backend-ci-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
-
 jobs:
   verify:
-    name: Verify on Java 25
+    name: Test, package and quality gate
     runs-on: ubuntu-latest
-    timeout-minutes: 20
 
     steps:
-      - name: Check out source
+      - name: Checkout
         uses: actions/checkout@v7
 
       - name: Set up Java 25
@@ -35,65 +30,61 @@ jobs:
           java-version: '25'
           cache: maven
 
-      - name: Compile, test and package
-        run: mvn -B -ntp verify
+      - name: Verify with Maven Wrapper
+        run: ./mvnw -B -ntp verify
 
       - name: Publish coverage summary
-        shell: bash
+        if: always()
         run: |
-          python - <<'PY'
+          if [ ! -f target/site/jacoco/jacoco.csv ]; then
+            echo "JaCoCo report was not generated." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          python3 - <<'PY'
           import csv
-          import os
           from pathlib import Path
 
-          report = Path("target/site/jacoco/jacoco.csv")
-          rows = list(csv.DictReader(report.open(encoding="utf-8")))
-          counters = [
-              ("Instructions", "INSTRUCTION_MISSED", "INSTRUCTION_COVERED"),
-              ("Branches", "BRANCH_MISSED", "BRANCH_COVERED"),
-              ("Lines", "LINE_MISSED", "LINE_COVERED"),
-              ("Methods", "METHOD_MISSED", "METHOD_COVERED"),
-              ("Complexity", "COMPLEXITY_MISSED", "COMPLEXITY_COVERED"),
-          ]
+          rows = list(csv.DictReader(Path('target/site/jacoco/jacoco.csv').open()))
+          line_missed = sum(int(row['LINE_MISSED']) for row in rows)
+          line_covered = sum(int(row['LINE_COVERED']) for row in rows)
+          branch_missed = sum(int(row['BRANCH_MISSED']) for row in rows)
+          branch_covered = sum(int(row['BRANCH_COVERED']) for row in rows)
 
-          lines = ["## JaCoCo coverage", "", "| Metric | Covered | Missed | Coverage |", "| --- | ---: | ---: | ---: |"]
-          for label, missed_key, covered_key in counters:
-              missed = sum(int(row[missed_key]) for row in rows)
-              covered = sum(int(row[covered_key]) for row in rows)
-              total = missed + covered
-              percentage = (covered / total * 100) if total else 100.0
-              lines.append(f"| {label} | {covered} | {missed} | {percentage:.2f}% |")
-              print(f"{label}: {percentage:.2f}% ({covered}/{total})")
+          def percentage(covered, missed):
+              total = covered + missed
+              return 100.0 if total == 0 else covered * 100.0 / total
 
-          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
-              summary.write("\n".join(lines) + "\n")
+          with Path(__import__('os').environ['GITHUB_STEP_SUMMARY']).open('a') as summary:
+              summary.write('## JaCoCo coverage\n\n')
+              summary.write('| Metric | Coverage | Gate |\n')
+              summary.write('| --- | ---: | ---: |\n')
+              summary.write(f"| Lines | {percentage(line_covered, line_missed):.2f}% | 85% |\n")
+              summary.write(f"| Branches | {percentage(branch_covered, branch_missed):.2f}% | 60% |\n")
           PY
 
-      - name: Upload JaCoCo coverage report
-        uses: actions/upload-artifact@v7
+      - name: Upload JaCoCo report
+        if: always()
+        uses: actions/upload-artifact@v6
         with:
-          name: jacoco-coverage-report
-          path: target/site/jacoco/
-          if-no-files-found: error
-          retention-days: 14
-
-      - name: Upload application artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: truck-life-simulator-api
-          path: target/*.jar
-          if-no-files-found: error
-          retention-days: 7
+          name: jacoco-report
+          path: target/site/jacoco
+          if-no-files-found: ignore
 
   container:
     name: Build OCI image
-    needs: verify
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    needs: verify
 
     steps:
-      - name: Check out source
+      - name: Checkout
         uses: actions/checkout@v7
 
-      - name: Build application image
-        run: docker build --tag truck-life-simulator-api:${{ github.sha }} .
+      - name: Set up Java 25
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+
+      - name: Build OCI image
+        run: ./mvnw -B -ntp -DskipTests spring-boot:build-image

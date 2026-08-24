@@ -93,7 +93,7 @@ class RefreshCookieOriginFilterTest {
     private String problemCode(MockHttpServletResponse response) throws Exception {
         JsonNode problem = objectMapper.readTree(response.getContentAsByteArray());
         return problem.has("code")
-                ? problem.path("code").asText()
-                : problem.path("properties").path("code").asText();
+                ? problem.path("code").asString()
+                : problem.path("properties").path("code").asString();
     }
 }
