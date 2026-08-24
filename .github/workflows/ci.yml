@@ -36,7 +36,7 @@ jobs:
           cache: maven
 
       - name: Compile, test and package
-        run: mvn -B -ntp verify
+        run: sh ./mvnw -B -ntp verify
 
       - name: Publish coverage summary
         shell: bash
