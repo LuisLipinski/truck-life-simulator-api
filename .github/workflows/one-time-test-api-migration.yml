@@ -1,0 +1,49 @@
+name: One-time deprecated test API migration
+
+on:
+  push:
+    branches:
+      - chore/backend-hardening-next
+
+permissions:
+  contents: write
+
+jobs:
+  migrate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout feature branch
+        uses: actions/checkout@v7
+        with:
+          ref: chore/backend-hardening-next
+          fetch-depth: 0
+
+      - name: Migrate deprecated test APIs
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          while IFS= read -r file; do
+            sed -i 's/import org\.testcontainers\.containers\.PostgreSQLContainer;/import org.testcontainers.postgresql.PostgreSQLContainer;/' "$file"
+          done < <(grep -RIl 'import org\.testcontainers\.containers\.PostgreSQLContainer;' src/test/java || true)
+
+          sed -i 's/\.asText()/\.asString()/g' \
+            src/test/java/com/luislipinski/trucklife/identity/config/RefreshCookieOriginFilterTest.java
+
+          sed -i 's#actions/upload-artifact@v4#actions/upload-artifact@v6#' \
+            .github/workflows/ci.yml
+
+          rm -f .github/workflows/dependency-review.yml
+          rm -f .github/workflows/one-time-test-api-migration.yml
+
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+
+          if git diff --cached --quiet; then
+            exit 0
+          fi
+
+          git commit -m 'test: migrate deprecated test APIs'
+          git push origin HEAD:chore/backend-hardening-next
