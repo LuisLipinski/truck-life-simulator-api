@@ -116,7 +116,11 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
-        LOGGER.error("Unhandled request error", exception);
+        LOGGER.error(
+                "Unhandled request error type={} correlationId={}",
+                exception.getClass().getName(),
+                request.getAttribute(CorrelationIdFilter.REQUEST_ATTRIBUTE)
+        );
         return problem(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "INTERNAL_ERROR",
