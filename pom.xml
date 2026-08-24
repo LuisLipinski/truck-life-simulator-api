@@ -21,6 +21,7 @@
         <java.version>25</java.version>
         <archunit.version>1.5.0</archunit.version>
         <bouncycastle.version>1.85.2</bouncycastle.version>
+        <jacoco.version>0.8.15</jacoco.version>
         <springdoc.version>3.1.0</springdoc.version>
         <testcontainers.version>2.0.5</testcontainers.version>
     </properties>
@@ -119,6 +120,26 @@
                     <execution>
                         <goals>
                             <goal>build-info</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.jacoco</groupId>
+                <artifactId>jacoco-maven-plugin</artifactId>
+                <version>${jacoco.version}</version>
+                <executions>
+                    <execution>
+                        <id>prepare-agent</id>
+                        <goals>
+                            <goal>prepare-agent</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>report</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>report</goal>
                         </goals>
                     </execution>
                 </executions>
