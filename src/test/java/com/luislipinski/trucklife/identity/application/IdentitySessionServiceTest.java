@@ -199,7 +199,7 @@ class IdentitySessionServiceTest {
         assertThat(current.getReplacedBy()).isNotNull();
         assertThat(current.getReplacedBy().getFamilyId()).isEqualTo(familyId);
         assertThat(current.getReplacedBy().getParent()).isSameAs(current);
-        assertThat(current.getReplacedBy().getCreatedIp()).isEqualTo("203.0.113.13");
+        assertThat(current.getReplacedBy().getIpAddress()).isEqualTo("203.0.113.13");
         assertThat(current.getReplacedBy().getUserAgent()).isEqualTo("test-agent");
         assertThat(current.getRevokedAt()).isEqualTo(NOW);
         verify(accessTokenIssuer).issue(user, familyId);
