@@ -16,6 +16,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -29,14 +30,16 @@ public class IdentityAccountWriter {
     private final RefreshTokenRepository refreshTokenRepository;
     private final ActionTokenGenerator tokenGenerator;
     private final IdentityProperties properties;
+    private final PasswordEncoder passwordEncoder;
     private final Clock clock;
 
-    public IdentityAccountWriter(UserRepository userRepository, UserActionTokenRepository actionTokenRepository, RefreshTokenRepository refreshTokenRepository, ActionTokenGenerator tokenGenerator, IdentityProperties properties, Clock clock) {
+    public IdentityAccountWriter(UserRepository userRepository, UserActionTokenRepository actionTokenRepository, RefreshTokenRepository refreshTokenRepository, ActionTokenGenerator tokenGenerator, IdentityProperties properties, PasswordEncoder passwordEncoder, Clock clock) {
         this.userRepository = userRepository;
         this.actionTokenRepository = actionTokenRepository;
         this.refreshTokenRepository = refreshTokenRepository;
         this.tokenGenerator = tokenGenerator;
         this.properties = properties;
+        this.passwordEncoder = passwordEncoder;
         this.clock = clock;
     }
 
@@ -106,6 +109,24 @@ public class IdentityAccountWriter {
         refreshTokenRepository.revokeActiveForUser(user.getId(), now);
     }
 
+    @Transactional
+    public void changePassword(UUID userId, String currentRawPassword, String newPasswordHash) {
+        Instant now = clock.instant();
+        UserEntity user = userRepository.findByIdForUpdate(userId).orElseThrow(this::authenticatedAccountUnavailable);
+        if (!passwordEncoder.matches(currentRawPassword, user.getPasswordHash())) {
+            throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "CURRENT_PASSWORD_INVALID",
+                    "Current password invalid",
+                    "The current password is invalid"
+            );
+        }
+
+        actionTokenRepository.markActiveTokensAsUsed(user.getId(), UserActionTokenPurpose.PASSWORD_RESET, now);
+        user.changePassword(newPasswordHash, now);
+        refreshTokenRepository.revokeActiveForUser(user.getId(), now);
+    }
+
     private PendingVerificationDelivery createVerificationToken(UserEntity user, Instant now) {
         ActionTokenGenerator.GeneratedActionToken generated = tokenGenerator.generate();
         Instant expiresAt = now.plus(properties.emailVerificationTtl());
@@ -119,5 +140,9 @@ public class IdentityAccountWriter {
 
     private ApiProblemException invalidPasswordResetToken() {
         return new ApiProblemException(HttpStatus.BAD_REQUEST, "PASSWORD_RESET_TOKEN_INVALID", "Invalid password reset token", "The password reset token is invalid");
+    }
+
+    private ApiProblemException authenticatedAccountUnavailable() {
+        return new ApiProblemException(HttpStatus.UNAUTHORIZED, "AUTHENTICATION_REQUIRED", "Authentication required", "The authenticated account is no longer available");
     }
 }
