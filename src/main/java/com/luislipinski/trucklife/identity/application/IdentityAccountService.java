@@ -3,6 +3,7 @@ package com.luislipinski.trucklife.identity.application;
 import com.luislipinski.trucklife.identity.email.VerificationEmailDeliveryPort;
 import java.sql.SQLException;
 import java.util.Locale;
+import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -66,6 +67,11 @@ public class IdentityAccountService implements IdentityAccountOperations {
         String tokenHash = TokenDigests.sha256(rawToken);
         rateLimiter.checkEmailVerification(tokenHash, safeClientAddress(clientAddress));
         accountWriter.resetPassword(tokenHash, passwordEncoder.encode(newRawPassword));
+    }
+
+    @Override
+    public void changePassword(UUID userId, String currentRawPassword, String newRawPassword) {
+        accountWriter.changePassword(userId, currentRawPassword, passwordEncoder.encode(newRawPassword));
     }
 
     private void deliverVerification(PendingVerificationDelivery delivery) {
