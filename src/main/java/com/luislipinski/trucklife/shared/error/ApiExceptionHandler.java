@@ -12,9 +12,14 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -27,6 +32,62 @@ public class ApiExceptionHandler {
                 HttpStatus.NOT_FOUND,
                 exception.code(),
                 "Resource not found",
+                exception.getMessage(),
+                request
+        );
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    ProblemDetail handleEndpointNotFound(
+            NoResourceFoundException exception,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.NOT_FOUND,
+                "ENDPOINT_NOT_FOUND",
+                "Endpoint not found",
+                "The requested endpoint does not exist",
+                request
+        );
+    }
+
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    ProblemDetail handleMethodNotAllowed(
+            HttpRequestMethodNotSupportedException exception,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                "METHOD_NOT_ALLOWED",
+                "Method not allowed",
+                "The HTTP method is not supported for this endpoint",
+                request
+        );
+    }
+
+    @ExceptionHandler(RateLimitExceededException.class)
+    ResponseEntity<ProblemDetail> handleRateLimit(
+            RateLimitExceededException exception,
+            HttpServletRequest request
+    ) {
+        ProblemDetail problem = problem(
+                exception.status(),
+                exception.code(),
+                exception.title(),
+                exception.getMessage(),
+                request
+        );
+        return ResponseEntity.status(exception.status())
+                .header("Retry-After", Long.toString(exception.retryAfterSeconds()))
+                .body(problem);
+    }
+
+    @ExceptionHandler(ApiProblemException.class)
+    ProblemDetail handleApiProblem(ApiProblemException exception, HttpServletRequest request) {
+        return problem(
+                exception.status(),
+                exception.code(),
+                exception.title(),
                 exception.getMessage(),
                 request
         );
@@ -70,9 +131,41 @@ public class ApiExceptionHandler {
         return problem;
     }
 
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    ProblemDetail handleUnreadableMessage(
+            HttpMessageNotReadableException exception,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                "MALFORMED_REQUEST",
+                "Malformed request",
+                "The request body could not be read",
+                request
+        );
+    }
+
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    ProblemDetail handleUnsupportedMediaType(
+            HttpMediaTypeNotSupportedException exception,
+            HttpServletRequest request
+    ) {
+        return problem(
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "UNSUPPORTED_MEDIA_TYPE",
+                "Unsupported media type",
+                "The request Content-Type is not supported",
+                request
+        );
+    }
+
     @ExceptionHandler(Exception.class)
     ProblemDetail handleUnexpected(Exception exception, HttpServletRequest request) {
-        LOGGER.error("Unhandled request error", exception);
+        LOGGER.error(
+                "Unhandled request error type={} correlationId={}",
+                exception.getClass().getName(),
+                request.getAttribute(CorrelationIdFilter.REQUEST_ATTRIBUTE)
+        );
         return problem(
                 HttpStatus.INTERNAL_SERVER_ERROR,
                 "INTERNAL_ERROR",

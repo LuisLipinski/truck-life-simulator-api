@@ -43,6 +43,39 @@ springdoc:
     operations-sorter: method
     tags-sorter: alpha
 
+identity:
+  email-verification-ttl: ${AUTH_EMAIL_VERIFICATION_TTL:PT24H}
+  email:
+    provider: ${AUTH_EMAIL_PROVIDER:discard}
+    resend-api-key: ${RESEND_API_KEY:}
+    from: ${AUTH_EMAIL_FROM:Truck Life Simulator <onboarding@resend.dev>}
+    frontend-base-url: ${AUTH_FRONTEND_BASE_URL:https://luislipinski.github.io/truck-life-simulator}
+    test-mode: ${AUTH_EMAIL_TEST_MODE:true}
+    test-recipient: ${AUTH_EMAIL_TEST_RECIPIENT:delivered@resend.dev}
+  session:
+    access-token-ttl: ${AUTH_ACCESS_TOKEN_TTL:PT10M}
+    refresh-token-ttl: ${AUTH_REFRESH_TOKEN_TTL:P30D}
+    refresh-cookie-name: TLS_REFRESH_TOKEN
+    refresh-cookie-path: /api/v1/auth
+  web:
+    csrf-cookie-name: TLS_CSRF_TOKEN
+  rate-limit:
+    registration:
+      max-attempts: ${AUTH_REGISTER_RATE_LIMIT_ATTEMPTS:5}
+      window: ${AUTH_REGISTER_RATE_LIMIT_WINDOW:PT1H}
+    email-verification:
+      max-attempts: ${AUTH_VERIFY_EMAIL_RATE_LIMIT_ATTEMPTS:10}
+      window: ${AUTH_VERIFY_EMAIL_RATE_LIMIT_WINDOW:PT30M}
+    resend-verification:
+      max-attempts: ${AUTH_RESEND_VERIFICATION_RATE_LIMIT_ATTEMPTS:3}
+      window: ${AUTH_RESEND_VERIFICATION_RATE_LIMIT_WINDOW:PT1H}
+    login:
+      max-attempts: ${AUTH_LOGIN_RATE_LIMIT_ATTEMPTS:10}
+      window: ${AUTH_LOGIN_RATE_LIMIT_WINDOW:PT15M}
+    refresh:
+      max-attempts: ${AUTH_REFRESH_RATE_LIMIT_ATTEMPTS:30}
+      window: ${AUTH_REFRESH_RATE_LIMIT_WINDOW:PT1M}
+
 info:
   app:
     name: ${spring.application.name}
