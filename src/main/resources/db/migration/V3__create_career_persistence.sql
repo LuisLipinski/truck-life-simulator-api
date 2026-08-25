@@ -48,6 +48,6 @@ CREATE TABLE careers (
     CONSTRAINT chk_careers_version CHECK (version >= 0)
 );
 
-CREATE INDEX idx_careers_user_id ON careers (user_id);
-CREATE INDEX idx_careers_user_game ON careers (user_id, game_id);
+CREATE INDEX idx_careers_user_game_created_at
+    ON careers (user_id, game_id, created_at, id);
 CREATE INDEX idx_careers_updated_at ON careers (updated_at);
