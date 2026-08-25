@@ -87,8 +87,7 @@ class PostgresMigrationTest {
                 "idx_refresh_tokens_expires_at",
                 "idx_user_action_tokens_user_purpose",
                 "idx_user_action_tokens_expires_at",
-                "idx_careers_user_id",
-                "idx_careers_user_game",
+                "idx_careers_user_game_created_at",
                 "idx_careers_updated_at"
         );
     }
