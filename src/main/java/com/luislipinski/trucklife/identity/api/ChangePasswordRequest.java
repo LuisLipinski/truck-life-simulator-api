@@ -6,7 +6,8 @@ import jakarta.validation.constraints.NotNull;
 
 public record ChangePasswordRequest(
         @NotNull
-        @Schema(format = "password", accessMode = Schema.AccessMode.WRITE_ONLY)
+        @ValidPassword
+        @Schema(format = "password", minLength = 12, maxLength = 128, accessMode = Schema.AccessMode.WRITE_ONLY)
         String currentPassword,
 
         @NotNull
