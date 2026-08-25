@@ -20,6 +20,7 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
     public static final String AUTHENTICATED_ACCOUNT_ATTRIBUTE =
             AccessTokenAuthenticationFilter.class.getName() + ".authenticatedAccount";
     private static final String ME_PATH = "/api/v1/me";
+    private static final String ME_PATH_PREFIX = ME_PATH + "/";
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtAccessTokenIssuer accessTokenIssuer;
@@ -38,7 +39,8 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
 
     @Override
     protected boolean shouldNotFilter(HttpServletRequest request) {
-        return !ME_PATH.equals(request.getRequestURI());
+        String requestUri = request.getRequestURI();
+        return !ME_PATH.equals(requestUri) && !requestUri.startsWith(ME_PATH_PREFIX);
     }
 
     @Override

@@ -12,6 +12,7 @@ import com.luislipinski.trucklife.identity.application.IdentityAccountOperations
 import com.luislipinski.trucklife.shared.error.ApiExceptionHandler;
 import com.luislipinski.trucklife.shared.error.RateLimitExceededException;
 import com.luislipinski.trucklife.shared.observability.CorrelationIdFilter;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -178,6 +179,11 @@ class AuthControllerTest {
 
         @Override
         public void resetPassword(String rawToken, String newRawPassword, String clientAddress) {
+            throwIfConfigured();
+        }
+
+        @Override
+        public void changePassword(UUID userId, String currentRawPassword, String newRawPassword) {
             throwIfConfigured();
         }
 
