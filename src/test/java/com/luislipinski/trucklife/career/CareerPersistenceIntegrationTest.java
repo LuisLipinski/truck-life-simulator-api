@@ -52,8 +52,8 @@ class CareerPersistenceIntegrationTest {
     }
 
     @Test
-    void persistsCareersAndScopesQueriesByOwner() {
-        CareerEntity olderOwnerCareer = career(
+    void persistsCareersAndScopesQueriesByOwnerAndGame() {
+        CareerEntity olderOwnerAtsCareer = career(
                 ownerId,
                 CareerGame.ATS,
                 "Alex Driver",
@@ -62,7 +62,16 @@ class CareerPersistenceIntegrationTest {
                 null,
                 Instant.parse("2026-08-25T10:00:00Z")
         );
-        CareerEntity newerOwnerCareer = career(
+        CareerEntity newerOwnerAtsCareer = career(
+                ownerId,
+                CareerGame.ATS,
+                "Alex Second",
+                "Tucson",
+                "AZ",
+                null,
+                Instant.parse("2026-08-25T12:00:00Z")
+        );
+        CareerEntity ownerEts2Career = career(
                 ownerId,
                 CareerGame.ETS2,
                 "Alex Europe",
@@ -71,7 +80,7 @@ class CareerPersistenceIntegrationTest {
                 "DE",
                 Instant.parse("2026-08-25T11:00:00Z")
         );
-        CareerEntity otherCareer = career(
+        CareerEntity otherUserAtsCareer = career(
                 otherUserId,
                 CareerGame.ATS,
                 "Other Driver",
@@ -81,16 +90,32 @@ class CareerPersistenceIntegrationTest {
                 Instant.parse("2026-08-25T09:00:00Z")
         );
 
-        careerRepository.saveAllAndFlush(List.of(newerOwnerCareer, otherCareer, olderOwnerCareer));
+        careerRepository.saveAllAndFlush(List.of(
+                newerOwnerAtsCareer,
+                ownerEts2Career,
+                otherUserAtsCareer,
+                olderOwnerAtsCareer
+        ));
 
-        List<CareerEntity> ownerCareers = careerRepository.findAllByUserIdOrderByCreatedAtAsc(ownerId);
+        List<CareerEntity> ownerAtsCareers =
+                careerRepository.findAllByUserIdAndGameOrderByCreatedAtAsc(ownerId, CareerGame.ATS);
+        List<CareerEntity> ownerEts2Careers =
+                careerRepository.findAllByUserIdAndGameOrderByCreatedAtAsc(ownerId, CareerGame.ETS2);
 
-        assertThat(ownerCareers)
+        assertThat(ownerAtsCareers)
                 .extracting(CareerEntity::getId)
-                .containsExactly(olderOwnerCareer.getId(), newerOwnerCareer.getId());
-        assertThat(careerRepository.findByIdAndUserId(otherCareer.getId(), ownerId)).isEmpty();
-        assertThat(careerRepository.findByIdAndUserId(otherCareer.getId(), otherUserId)).isPresent();
-        assertThat(newerOwnerCareer.getVersion()).isZero();
+                .containsExactly(olderOwnerAtsCareer.getId(), newerOwnerAtsCareer.getId());
+        assertThat(ownerEts2Careers)
+                .extracting(CareerEntity::getId)
+                .containsExactly(ownerEts2Career.getId());
+
+        assertThat(careerRepository.findByIdAndUserIdAndGame(
+                otherUserAtsCareer.getId(), ownerId, CareerGame.ATS)).isEmpty();
+        assertThat(careerRepository.findByIdAndUserIdAndGame(
+                ownerEts2Career.getId(), ownerId, CareerGame.ATS)).isEmpty();
+        assertThat(careerRepository.findByIdAndUserIdAndGame(
+                otherUserAtsCareer.getId(), otherUserId, CareerGame.ATS)).isPresent();
+        assertThat(ownerEts2Career.getVersion()).isZero();
     }
 
     private UUID insertUser(String email, String displayName) {
