@@ -95,6 +95,18 @@ class MyAccountIntegrationTest {
     }
 
     @Test
+    void preventsCachingAuthenticatedAccountData() {
+        UserEntity user = saveUser("cache@example.com", "Cache Safe Driver", UserRole.USER, UserStatus.ACTIVE, true);
+
+        restTestClient.get()
+                .uri(ME_PATH)
+                .header(HttpHeaders.AUTHORIZATION, "Bearer " + accessToken(user))
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(HttpHeaders.CACHE_CONTROL, "no-store");
+    }
+
+    @Test
     void isolatesAccountsByTheUserIdContainedInEachAccessToken() {
         UserEntity first = saveUser("first@example.com", "First Driver", UserRole.USER, UserStatus.ACTIVE, true);
         UserEntity second = saveUser("second@example.com", "Second Driver", UserRole.USER, UserStatus.ACTIVE, true);
