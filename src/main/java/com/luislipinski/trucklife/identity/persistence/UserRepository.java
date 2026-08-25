@@ -19,4 +19,8 @@ public interface UserRepository extends JpaRepository<UserEntity, UUID> {
     Optional<UserEntity> findByNormalizedEmailForUpdate(
             @Param("normalizedEmail") String normalizedEmail
     );
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select account from UserEntity account where account.id = :userId")
+    Optional<UserEntity> findByIdForUpdate(@Param("userId") UUID userId);
 }
