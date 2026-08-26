@@ -14,6 +14,8 @@ CREATE TABLE careers (
     state_code VARCHAR(10),
     country_code VARCHAR(10),
     base_city VARCHAR(160) NOT NULL,
+    default_truck_make VARCHAR(80),
+    default_truck_model VARCHAR(120),
     city_market_version VARCHAR(40),
     city_market_label VARCHAR(100),
     city_cost_factor NUMERIC(8,4),
@@ -33,6 +35,12 @@ CREATE TABLE careers (
     CONSTRAINT chk_careers_display_currency CHECK (display_currency ~ '^[A-Z]{3}$'),
     CONSTRAINT chk_careers_exchange_rate CHECK (exchange_rate > 0),
     CONSTRAINT chk_careers_base_city CHECK (BTRIM(base_city) <> ''),
+    CONSTRAINT chk_careers_default_truck_make CHECK (
+        default_truck_make IS NULL OR BTRIM(default_truck_make) <> ''
+    ),
+    CONSTRAINT chk_careers_default_truck_model CHECK (
+        default_truck_model IS NULL OR BTRIM(default_truck_model) <> ''
+    ),
     CONSTRAINT chk_careers_game_location CHECK (
         (game_id = 'ATS' AND state_code IS NOT NULL AND BTRIM(state_code) <> '')
         OR
