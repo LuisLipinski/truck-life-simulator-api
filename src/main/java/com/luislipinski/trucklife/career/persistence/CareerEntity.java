@@ -63,6 +63,12 @@ public class CareerEntity {
     @Column(name = "base_city", nullable = false, length = 160)
     private String baseCity;
 
+    @Column(name = "default_truck_make", length = 80)
+    private String defaultTruckMake;
+
+    @Column(name = "default_truck_model", length = 120)
+    private String defaultTruckModel;
+
     @Column(name = "city_market_version", length = 40)
     private String cityMarketVersion;
 
@@ -110,6 +116,8 @@ public class CareerEntity {
             String stateCode,
             String countryCode,
             String baseCity,
+            String defaultTruckMake,
+            String defaultTruckModel,
             String cityMarketVersion,
             String cityMarketLabel,
             BigDecimal cityCostFactor,
@@ -134,6 +142,8 @@ public class CareerEntity {
         this.stateCode = stateCode;
         this.countryCode = countryCode;
         this.baseCity = baseCity;
+        this.defaultTruckMake = defaultTruckMake;
+        this.defaultTruckModel = defaultTruckModel;
         this.cityMarketVersion = cityMarketVersion;
         this.cityMarketLabel = cityMarketLabel;
         this.cityCostFactor = cityCostFactor;
@@ -202,6 +212,14 @@ public class CareerEntity {
 
     public String getBaseCity() {
         return baseCity;
+    }
+
+    public String getDefaultTruckMake() {
+        return defaultTruckMake;
+    }
+
+    public String getDefaultTruckModel() {
+        return defaultTruckModel;
     }
 
     public String getCityMarketVersion() {
