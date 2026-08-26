@@ -15,4 +15,9 @@ class PasswordLengthValidatorTest {
         assertThat(validator.isValid("🚚".repeat(11), null)).isFalse();
         assertThat(validator.isValid("a".repeat(129), null)).isFalse();
     }
+
+    @Test
+    void allowsNullBecauseRequiredFieldValidationIsHandledSeparately() {
+        assertThat(validator.isValid(null, null)).isTrue();
+    }
 }
