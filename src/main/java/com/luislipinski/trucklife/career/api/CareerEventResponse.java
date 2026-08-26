@@ -3,7 +3,7 @@ package com.luislipinski.trucklife.career.api;
 import com.luislipinski.trucklife.career.domain.CareerEventType;
 import com.luislipinski.trucklife.career.persistence.CareerEventEntity;
 import java.time.Instant;
-import java.time.LocalDate;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import tools.jackson.core.JacksonException;
@@ -13,7 +13,8 @@ import tools.jackson.databind.ObjectMapper;
 public record CareerEventResponse(
         UUID id,
         CareerEventType type,
-        LocalDate effectiveDate,
+        int operationalWeek,
+        String effectiveDay,
         Instant recordedAt,
         Map<String, Object> changes
 ) {
@@ -26,7 +27,10 @@ public record CareerEventResponse(
             return new CareerEventResponse(
                     event.getId(),
                     event.getType(),
-                    event.getEffectiveDate(),
+                    event.getOperationalWeek(),
+                    event.getEffectiveDay() == null
+                            ? null
+                            : event.getEffectiveDay().name().toLowerCase(Locale.ROOT),
                     event.getRecordedAt(),
                     objectMapper.readValue(event.getChangesJson().getBytes(java.nio.charset.StandardCharsets.UTF_8), CHANGES_TYPE)
             );
