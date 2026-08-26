@@ -5,16 +5,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
-import java.time.LocalDate;
 
 public record UpdateCareerProfileRequest(
         @NotNull @PositiveOrZero Long version,
         @NotBlank @Size(max = 120) String driverName,
-        @Size(max = 800) String biography,
-        LocalDate effectiveDate
+        @Size(max = 800) String biography
 ) {
 
     UpdateCareerProfileCommand toCommand() {
-        return new UpdateCareerProfileCommand(version, driverName, biography, effectiveDate);
+        return new UpdateCareerProfileCommand(version, driverName, biography);
     }
 }
