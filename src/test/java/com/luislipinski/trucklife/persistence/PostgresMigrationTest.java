@@ -84,6 +84,17 @@ class PostgresMigrationTest {
                 """,
                 String.class
         );
+        List<String> currencyColumns = jdbcTemplate.queryForList(
+                """
+                SELECT column_name || ':' || data_type || ':' || character_maximum_length
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'careers'
+                  AND column_name IN ('base_currency', 'display_currency')
+                ORDER BY column_name
+                """,
+                String.class
+        );
 
         assertThat(tableCount).isEqualTo(5);
         assertThat(schemaVersion).isEqualTo("1");
@@ -102,6 +113,10 @@ class PostgresMigrationTest {
         assertThat(careerColumns).contains(
                 "default_truck_make",
                 "default_truck_model"
+        );
+        assertThat(currencyColumns).containsExactly(
+                "base_currency:character varying:3",
+                "display_currency:character varying:3"
         );
     }
 
