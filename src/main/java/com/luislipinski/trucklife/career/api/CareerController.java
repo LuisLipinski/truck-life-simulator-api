@@ -30,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import tools.jackson.databind.ObjectMapper;
 
 @RestController
 @RequestMapping(path = "/api/v1/careers")
@@ -39,10 +40,16 @@ public class CareerController {
 
     private final AccountAuthorization authorization;
     private final CareerOperations careerOperations;
+    private final ObjectMapper objectMapper;
 
-    public CareerController(AccountAuthorization authorization, CareerOperations careerOperations) {
+    public CareerController(
+            AccountAuthorization authorization,
+            CareerOperations careerOperations,
+            ObjectMapper objectMapper
+    ) {
         this.authorization = authorization;
         this.careerOperations = careerOperations;
+        this.objectMapper = objectMapper;
     }
 
     @PostMapping(consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
@@ -139,6 +146,93 @@ public class CareerController {
                 careerId,
                 request.toCommand()
         ));
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(response);
+    }
+
+    @PatchMapping(
+            path = "/{careerId}/employer",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Operation(summary = "Change the current employer and preserve a career event")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Employer changed"),
+            @ApiResponse(responseCode = "400", description = "Employer data is invalid"),
+            @ApiResponse(responseCode = "401", description = "Access token missing or invalid"),
+            @ApiResponse(responseCode = "404", description = "Career not found for this owner and game"),
+            @ApiResponse(responseCode = "409", description = "Career version is stale")
+    })
+    public ResponseEntity<CareerResponse> changeEmployer(
+            @PathVariable("careerId") UUID careerId,
+            @RequestParam(name = "game") CareerGame game,
+            @Valid @RequestBody ChangeCareerEmployerRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        AuthenticatedAccount account = authorizedAccount(servletRequest);
+        CareerResponse response = CareerResponse.from(careerOperations.changeEmployer(
+                account.userId(),
+                game,
+                careerId,
+                request.toCommand()
+        ));
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(response);
+    }
+
+    @PatchMapping(
+            path = "/{careerId}/base",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Operation(summary = "Change the current base and preserve its previous financial snapshot")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Base changed"),
+            @ApiResponse(responseCode = "400", description = "Base data is invalid"),
+            @ApiResponse(responseCode = "401", description = "Access token missing or invalid"),
+            @ApiResponse(responseCode = "404", description = "Career not found for this owner and game"),
+            @ApiResponse(responseCode = "409", description = "Career version is stale")
+    })
+    public ResponseEntity<CareerResponse> changeBase(
+            @PathVariable("careerId") UUID careerId,
+            @RequestParam(name = "game") CareerGame game,
+            @Valid @RequestBody ChangeCareerBaseRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        AuthenticatedAccount account = authorizedAccount(servletRequest);
+        CareerResponse response = CareerResponse.from(careerOperations.changeBase(
+                account.userId(),
+                game,
+                careerId,
+                request.toCommand()
+        ));
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(response);
+    }
+
+    @GetMapping(path = "/{careerId}/events", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "List immutable career history events")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Career event timeline"),
+            @ApiResponse(responseCode = "401", description = "Access token missing or invalid"),
+            @ApiResponse(responseCode = "404", description = "Career not found for this owner and game")
+    })
+    public ResponseEntity<List<CareerEventResponse>> listEvents(
+            @PathVariable("careerId") UUID careerId,
+            @RequestParam(name = "game") CareerGame game,
+            HttpServletRequest servletRequest
+    ) {
+        AuthenticatedAccount account = authorizedAccount(servletRequest);
+        List<CareerEventResponse> response = careerOperations.listEvents(
+                        account.userId(),
+                        game,
+                        careerId
+                ).stream()
+                .map(event -> CareerEventResponse.from(event, objectMapper))
+                .toList();
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(response);

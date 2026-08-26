@@ -11,6 +11,7 @@ import static org.mockito.Mockito.when;
 
 import com.luislipinski.trucklife.career.domain.CareerGame;
 import com.luislipinski.trucklife.career.persistence.CareerEntity;
+import com.luislipinski.trucklife.career.persistence.CareerEventRepository;
 import com.luislipinski.trucklife.career.persistence.CareerOwnerLock;
 import com.luislipinski.trucklife.career.persistence.CareerRepository;
 import com.luislipinski.trucklife.shared.error.ApiProblemException;
@@ -26,6 +27,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
+import tools.jackson.databind.ObjectMapper;
 
 class CareerServiceTest {
 
@@ -33,15 +35,19 @@ class CareerServiceTest {
 
     private CareerRepository careerRepository;
     private CareerOwnerLock ownerLock;
+    private CareerEventRepository eventRepository;
     private CareerService service;
 
     @BeforeEach
     void setUp() {
         careerRepository = mock(CareerRepository.class);
         ownerLock = mock(CareerOwnerLock.class);
+        eventRepository = mock(CareerEventRepository.class);
         service = new CareerService(
                 careerRepository,
                 ownerLock,
+                eventRepository,
+                mock(ObjectMapper.class),
                 Clock.fixed(NOW, ZoneOffset.UTC)
         );
     }
@@ -158,6 +164,7 @@ class CareerServiceTest {
         assertThat(updated.getBiography()).isNull();
         assertThat(updated.getUpdatedAt()).isEqualTo(NOW);
         verify(careerRepository).flush();
+        verify(eventRepository).save(any());
     }
 
     @Test

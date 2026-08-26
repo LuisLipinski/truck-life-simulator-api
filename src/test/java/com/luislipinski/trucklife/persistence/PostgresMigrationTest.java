@@ -46,7 +46,8 @@ class PostgresMigrationTest {
                     'users',
                     'refresh_tokens',
                     'user_action_tokens',
-                    'careers'
+                    'careers',
+                    'career_events'
                   )
                 """,
                 Integer.class
@@ -71,7 +72,7 @@ class PostgresMigrationTest {
                 SELECT indexname
                 FROM pg_indexes
                 WHERE schemaname = 'public'
-                  AND tablename IN ('users', 'refresh_tokens', 'user_action_tokens', 'careers')
+                  AND tablename IN ('users', 'refresh_tokens', 'user_action_tokens', 'careers', 'career_events')
                 """,
                 String.class
         );
@@ -81,6 +82,15 @@ class PostgresMigrationTest {
                 FROM information_schema.columns
                 WHERE table_schema = 'public'
                   AND table_name = 'careers'
+                """,
+                String.class
+        );
+        List<String> eventColumns = jdbcTemplate.queryForList(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'career_events'
                 """,
                 String.class
         );
@@ -96,9 +106,9 @@ class PostgresMigrationTest {
                 String.class
         );
 
-        assertThat(tableCount).isEqualTo(5);
+        assertThat(tableCount).isEqualTo(6);
         assertThat(schemaVersion).isEqualTo("1");
-        assertThat(latestMigration).isEqualTo("3");
+        assertThat(latestMigration).isEqualTo("4");
         assertThat(indexes).contains(
                 "uq_users_normalized_email",
                 "idx_users_status",
@@ -108,11 +118,19 @@ class PostgresMigrationTest {
                 "idx_user_action_tokens_user_purpose",
                 "idx_user_action_tokens_expires_at",
                 "idx_careers_user_game_created_at",
-                "idx_careers_updated_at"
+                "idx_careers_updated_at",
+                "idx_career_events_career_effective_date"
         );
         assertThat(careerColumns).contains(
                 "default_truck_make",
                 "default_truck_model"
+        );
+        assertThat(eventColumns).contains(
+                "career_id",
+                "event_type",
+                "effective_date",
+                "recorded_at",
+                "changes_json"
         );
         assertThat(currencyColumns).containsExactly(
                 "base_currency:character varying:3",

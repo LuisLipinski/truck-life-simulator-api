@@ -263,4 +263,35 @@ public class CareerEntity {
         this.biography = biography;
         this.updatedAt = updatedAt;
     }
+
+    public void changeEmployer(String companyName, Instant updatedAt) {
+        this.companyName = companyName;
+        this.updatedAt = updatedAt;
+    }
+
+    public void changeBase(
+            String stateCode,
+            String countryCode,
+            String baseCity,
+            String baseCurrency,
+            BigDecimal exchangeRate,
+            LocalDate exchangeRateAsOf,
+            String cityMarketVersion,
+            String cityMarketLabel,
+            BigDecimal cityCostFactor,
+            BigDecimal citySalaryFactor,
+            Instant updatedAt
+    ) {
+        this.stateCode = stateCode;
+        this.countryCode = countryCode;
+        this.baseCity = baseCity;
+        this.baseCurrency = baseCurrency;
+        this.exchangeRate = exchangeRate;
+        this.exchangeRateAsOf = exchangeRateAsOf;
+        this.cityMarketVersion = cityMarketVersion;
+        this.cityMarketLabel = cityMarketLabel;
+        this.cityCostFactor = cityCostFactor;
+        this.citySalaryFactor = citySalaryFactor;
+        this.updatedAt = updatedAt;
+    }
 }
