@@ -5,7 +5,7 @@ import java.time.LocalDate;
 
 public record ChangeCareerBaseCommand(
         long version,
-        LocalDate effectiveDate,
+        String effectiveDay,
         String stateCode,
         String countryCode,
         String baseCity,
