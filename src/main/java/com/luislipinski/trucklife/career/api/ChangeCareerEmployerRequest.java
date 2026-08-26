@@ -5,15 +5,14 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
-import java.time.LocalDate;
 
 public record ChangeCareerEmployerRequest(
         @NotNull @PositiveOrZero Long version,
         @NotBlank @Size(max = 160) String companyName,
-        @NotNull LocalDate effectiveDate
+        @NotBlank @Size(max = 9) String effectiveDay
 ) {
 
     ChangeCareerEmployerCommand toCommand() {
-        return new ChangeCareerEmployerCommand(version, companyName, effectiveDate);
+        return new ChangeCareerEmployerCommand(version, companyName, effectiveDay);
     }
 }
