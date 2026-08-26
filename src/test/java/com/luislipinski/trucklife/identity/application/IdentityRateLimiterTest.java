@@ -71,6 +71,37 @@ class IdentityRateLimiterTest {
                 .isInstanceOf(RateLimitExceededException.class);
     }
 
+    @Test
+    void periodicallyCleansExpiredWindows() {
+        MutableClock clock = new MutableClock(Instant.parse("2026-08-22T18:00:00Z"));
+        IdentityProperties.Policy policy = new IdentityProperties.Policy(
+                300,
+                Duration.ofMinutes(1)
+        );
+        IdentityRateLimiter limiter = new IdentityRateLimiter(
+                new IdentityProperties(
+                        Duration.ofHours(24),
+                        new IdentityProperties.RateLimits(
+                                policy,
+                                policy,
+                                policy,
+                                policy,
+                                policy
+                        )
+                ),
+                clock
+        );
+
+        limiter.checkRegistration("expired-subject");
+        for (int attempt = 1; attempt < 255; attempt++) {
+            limiter.checkRegistration("active-subject");
+        }
+
+        clock.advance(Duration.ofSeconds(61));
+        limiter.checkRegistration("cleanup-trigger");
+        limiter.checkRegistration("expired-subject");
+    }
+
     private static final class MutableClock extends Clock {
 
         private Instant instant;
