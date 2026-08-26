@@ -8,6 +8,7 @@ import com.luislipinski.trucklife.career.persistence.CareerRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -137,9 +138,9 @@ class CareerPersistenceIntegrationTest {
                 email.toLowerCase(),
                 "$argon2id$v=19$m=65536,t=3,p=1$test$test",
                 displayName,
-                now,
-                now,
-                now
+                now.atOffset(ZoneOffset.UTC),
+                now.atOffset(ZoneOffset.UTC),
+                now.atOffset(ZoneOffset.UTC)
         );
         return id;
     }
