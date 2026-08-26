@@ -6,5 +6,5 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface CareerEventRepository extends JpaRepository<CareerEventEntity, UUID> {
 
-    List<CareerEventEntity> findAllByCareerIdOrderByEffectiveDateAscRecordedAtAscIdAsc(UUID careerId);
+    List<CareerEventEntity> findAllByCareerIdOrderByOperationalWeekAscRecordedAtAscIdAsc(UUID careerId);
 }
