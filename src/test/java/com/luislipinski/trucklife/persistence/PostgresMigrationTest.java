@@ -47,7 +47,8 @@ class PostgresMigrationTest {
                     'refresh_tokens',
                     'user_action_tokens',
                     'careers',
-                    'career_events'
+                    'career_events',
+                    'trips'
                   )
                 """,
                 Integer.class
@@ -72,7 +73,7 @@ class PostgresMigrationTest {
                 SELECT indexname
                 FROM pg_indexes
                 WHERE schemaname = 'public'
-                  AND tablename IN ('users', 'refresh_tokens', 'user_action_tokens', 'careers', 'career_events')
+                  AND tablename IN ('users', 'refresh_tokens', 'user_action_tokens', 'careers', 'career_events', 'trips')
                 """,
                 String.class
         );
@@ -94,6 +95,15 @@ class PostgresMigrationTest {
                 """,
                 String.class
         );
+        List<String> tripColumns = jdbcTemplate.queryForList(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'trips'
+                """,
+                String.class
+        );
         List<String> currencyColumns = jdbcTemplate.queryForList(
                 """
                 SELECT column_name || ':' || data_type || ':' || character_maximum_length
@@ -106,9 +116,9 @@ class PostgresMigrationTest {
                 String.class
         );
 
-        assertThat(tableCount).isEqualTo(6);
+        assertThat(tableCount).isEqualTo(7);
         assertThat(schemaVersion).isEqualTo("1");
-        assertThat(latestMigration).isEqualTo("4");
+        assertThat(latestMigration).isEqualTo("5");
         assertThat(indexes).contains(
                 "uq_users_normalized_email",
                 "idx_users_status",
@@ -119,7 +129,8 @@ class PostgresMigrationTest {
                 "idx_user_action_tokens_expires_at",
                 "idx_careers_user_game_created_at",
                 "idx_careers_updated_at",
-                "idx_career_events_career_effective_date"
+                "idx_career_events_career_effective_date",
+                "idx_trips_career_week_created_at"
         );
         assertThat(careerColumns).contains(
                 "default_truck_make",
@@ -131,6 +142,23 @@ class PostgresMigrationTest {
                 "effective_date",
                 "recorded_at",
                 "changes_json"
+        );
+        assertThat(tripColumns).contains(
+                "career_id",
+                "operational_week",
+                "departure_day",
+                "departure_time",
+                "arrival_day",
+                "arrival_time",
+                "official_distance",
+                "break_minutes",
+                "truck_make",
+                "truck_model",
+                "odometer_start",
+                "odometer_end",
+                "source",
+                "employer_snapshot_json",
+                "base_snapshot_json"
         );
         assertThat(currencyColumns).containsExactly(
                 "base_currency:character varying:3",
