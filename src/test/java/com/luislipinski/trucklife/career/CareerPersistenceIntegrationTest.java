@@ -108,6 +108,10 @@ class CareerPersistenceIntegrationTest {
         assertThat(ownerEts2Careers)
                 .extracting(CareerEntity::getId)
                 .containsExactly(ownerEts2Career.getId());
+        assertThat(ownerAtsCareers.get(0).getDefaultTruckMake()).isEqualTo("Kenworth");
+        assertThat(ownerAtsCareers.get(0).getDefaultTruckModel()).isEqualTo("T680");
+        assertThat(ownerEts2Careers.get(0).getDefaultTruckMake()).isNull();
+        assertThat(ownerEts2Careers.get(0).getDefaultTruckModel()).isNull();
 
         assertThat(careerRepository.findByIdAndUserIdAndGame(
                 otherUserAtsCareer.getId(), ownerId, CareerGame.ATS)).isEmpty();
@@ -165,6 +169,8 @@ class CareerPersistenceIntegrationTest {
                 stateCode,
                 countryCode,
                 baseCity,
+                game == CareerGame.ATS ? "Kenworth" : null,
+                game == CareerGame.ATS ? "T680" : null,
                 "test-v1",
                 "Test market",
                 new BigDecimal("1.0000"),
