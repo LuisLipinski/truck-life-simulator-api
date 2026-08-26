@@ -45,7 +45,8 @@ class PostgresMigrationTest {
                     'platform_metadata',
                     'users',
                     'refresh_tokens',
-                    'user_action_tokens'
+                    'user_action_tokens',
+                    'careers'
                   )
                 """,
                 Integer.class
@@ -65,27 +66,57 @@ class PostgresMigrationTest {
                 """,
                 String.class
         );
-        List<String> identityIndexes = jdbcTemplate.queryForList(
+        List<String> indexes = jdbcTemplate.queryForList(
                 """
                 SELECT indexname
                 FROM pg_indexes
                 WHERE schemaname = 'public'
-                  AND tablename IN ('users', 'refresh_tokens', 'user_action_tokens')
+                  AND tablename IN ('users', 'refresh_tokens', 'user_action_tokens', 'careers')
+                """,
+                String.class
+        );
+        List<String> careerColumns = jdbcTemplate.queryForList(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'careers'
+                """,
+                String.class
+        );
+        List<String> currencyColumns = jdbcTemplate.queryForList(
+                """
+                SELECT column_name || ':' || data_type || ':' || character_maximum_length
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'careers'
+                  AND column_name IN ('base_currency', 'display_currency')
+                ORDER BY column_name
                 """,
                 String.class
         );
 
-        assertThat(tableCount).isEqualTo(4);
+        assertThat(tableCount).isEqualTo(5);
         assertThat(schemaVersion).isEqualTo("1");
-        assertThat(latestMigration).isEqualTo("2");
-        assertThat(identityIndexes).contains(
+        assertThat(latestMigration).isEqualTo("3");
+        assertThat(indexes).contains(
                 "uq_users_normalized_email",
                 "idx_users_status",
                 "idx_refresh_tokens_user_id",
                 "idx_refresh_tokens_family_id",
                 "idx_refresh_tokens_expires_at",
                 "idx_user_action_tokens_user_purpose",
-                "idx_user_action_tokens_expires_at"
+                "idx_user_action_tokens_expires_at",
+                "idx_careers_user_game_created_at",
+                "idx_careers_updated_at"
+        );
+        assertThat(careerColumns).contains(
+                "default_truck_make",
+                "default_truck_model"
+        );
+        assertThat(currencyColumns).containsExactly(
+                "base_currency:character varying:3",
+                "display_currency:character varying:3"
         );
     }
 
