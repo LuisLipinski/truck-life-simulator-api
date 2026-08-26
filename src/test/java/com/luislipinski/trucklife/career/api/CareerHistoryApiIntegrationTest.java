@@ -69,7 +69,7 @@ class CareerHistoryApiIntegrationTest {
     }
 
     @Test
-    void recordsProfileEmployerAndBaseChangesAsAnImmutableTimeline() {
+    void recordsProfileEmployerAndBaseChangesAsAnImmutableCalendarlessTimeline() {
         UserEntity owner = saveUser("history-owner@example.com");
         String token = accessToken(owner);
         CareerResponse created = create(token, CareerGame.ATS, "Original Driver");
@@ -82,8 +82,7 @@ class CareerHistoryApiIntegrationTest {
                 Map.of(
                         "version", created.version(),
                         "driverName", "Corrected Driver",
-                        "biography", "Updated biography",
-                        "effectiveDate", "2026-08-24"
+                        "biography", "Updated biography"
                 )
         );
         CareerResponse employer = patch(
@@ -94,13 +93,13 @@ class CareerHistoryApiIntegrationTest {
                 Map.of(
                         "version", profile.version(),
                         "companyName", "New Logistics",
-                        "effectiveDate", "2026-08-25"
+                        "effectiveDay", "tuesday"
                 )
         );
 
         Map<String, Object> baseRequest = new LinkedHashMap<>();
         baseRequest.put("version", employer.version());
-        baseRequest.put("effectiveDate", "2026-08-26");
+        baseRequest.put("effectiveDay", "wednesday");
         baseRequest.put("stateCode", "TX");
         baseRequest.put("baseCity", "Dallas, TX");
         baseRequest.put("baseCurrency", "USD");
@@ -128,21 +127,50 @@ class CareerHistoryApiIntegrationTest {
                 .expectBody()
                 .jsonPath("$.length()").isEqualTo(3)
                 .jsonPath("$[0].type").isEqualTo("PROFILE_UPDATED")
-                .jsonPath("$[0].effectiveDate").isEqualTo("2026-08-24")
+                .jsonPath("$[0].operationalWeek").isEqualTo(1)
                 .jsonPath("$[0].changes.driverName.previous").isEqualTo("Original Driver")
                 .jsonPath("$[0].changes.driverName.next").isEqualTo("Corrected Driver")
                 .jsonPath("$[0].changes.bio.previous").isEqualTo("Career API integration test")
                 .jsonPath("$[0].changes.bio.next").isEqualTo("Updated biography")
                 .jsonPath("$[1].type").isEqualTo("EMPLOYER_CHANGED")
+                .jsonPath("$[1].operationalWeek").isEqualTo(1)
+                .jsonPath("$[1].effectiveDay").isEqualTo("tuesday")
                 .jsonPath("$[1].changes.company.previous").isEqualTo("Road Logistics")
                 .jsonPath("$[1].changes.company.next").isEqualTo("New Logistics")
                 .jsonPath("$[2].type").isEqualTo("BASE_CHANGED")
+                .jsonPath("$[2].operationalWeek").isEqualTo(1)
+                .jsonPath("$[2].effectiveDay").isEqualTo("wednesday")
                 .jsonPath("$[2].changes.base.previous.city").isEqualTo("Phoenix, AZ")
                 .jsonPath("$[2].changes.base.previous.stateCode").isEqualTo("AZ")
                 .jsonPath("$[2].changes.base.next.city").isEqualTo("Dallas, TX")
                 .jsonPath("$[2].changes.base.next.stateCode").isEqualTo("TX");
 
         assertThat(eventRepository.count()).isEqualTo(3);
+    }
+
+    @Test
+    void rejectsInvalidEffectiveWeekdayWithoutAppendingAnEvent() {
+        UserEntity owner = saveUser("invalid-weekday@example.com");
+        String token = accessToken(owner);
+        CareerResponse created = create(token, CareerGame.ATS, "Weekday Driver");
+
+        restTestClient.patch()
+                .uri(CAREERS_PATH + "/" + created.id() + "/employer?game=ATS")
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(
+                        "version", created.version(),
+                        "companyName", "Invalid Day Logistics",
+                        "effectiveDay", "funday"
+                ))
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("CAREER_EFFECTIVE_DAY_INVALID");
+
+        assertThat(eventRepository.count()).isZero();
+        assertThat(careerRepository.findById(created.id()).orElseThrow().getCompanyName())
+                .isEqualTo("Road Logistics");
     }
 
     @Test
@@ -159,7 +187,7 @@ class CareerHistoryApiIntegrationTest {
                 Map.of(
                         "version", created.version(),
                         "companyName", "First Company",
-                        "effectiveDate", "2026-08-25"
+                        "effectiveDay", "tuesday"
                 )
         );
 
@@ -170,7 +198,7 @@ class CareerHistoryApiIntegrationTest {
                 .body(Map.of(
                         "version", created.version(),
                         "companyName", "Stale Company",
-                        "effectiveDate", "2026-08-26"
+                        "effectiveDay", "wednesday"
                 ))
                 .exchange()
                 .expectStatus().isEqualTo(409)
@@ -210,7 +238,7 @@ class CareerHistoryApiIntegrationTest {
                 .body(Map.of(
                         "version", career.version(),
                         "companyName", "Intruder Logistics",
-                        "effectiveDate", "2026-08-26"
+                        "effectiveDay", "wednesday"
                 ))
                 .exchange()
                 .expectStatus().isNotFound()
@@ -229,7 +257,7 @@ class CareerHistoryApiIntegrationTest {
     }
 
     @Test
-    void validatesTheGameSpecificBaseLocationAndDocumentsHistoryEndpoints() {
+    void validatesTheGameSpecificBaseLocationAndDocumentsCalendarlessHistoryContract() {
         UserEntity owner = saveUser("base-validation@example.com");
         String token = accessToken(owner);
         CareerResponse career = create(token, CareerGame.ATS, "Base Driver");
@@ -240,7 +268,7 @@ class CareerHistoryApiIntegrationTest {
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of(
                         "version", career.version(),
-                        "effectiveDate", "2026-08-26",
+                        "effectiveDay", "wednesday",
                         "baseCity", "Dallas, TX",
                         "baseCurrency", "USD",
                         "exchangeRate", new BigDecimal("5.30000000")
@@ -257,7 +285,20 @@ class CareerHistoryApiIntegrationTest {
                 .expectBody()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/events'].get.responses['200']").exists()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/employer'].patch.responses['409']").exists()
-                .jsonPath("$.paths['/api/v1/careers/{careerId}/base'].patch.responses['409']").exists();
+                .jsonPath("$.paths['/api/v1/careers/{careerId}/base'].patch.responses['409']").exists()
+                .jsonPath("$.components.schemas.ChangeCareerEmployerRequest.properties.effectiveDay").exists()
+                .jsonPath("$.components.schemas.ChangeCareerBaseRequest.properties.effectiveDay").exists()
+                .jsonPath("$.components.schemas.CareerEventResponse.properties.operationalWeek").exists()
+                .jsonPath("$.components.schemas.CareerEventResponse.properties.effectiveDay").exists();
+
+        String openApi = Objects.requireNonNull(restTestClient.get()
+                .uri("/v3/api-docs")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(String.class)
+                .returnResult()
+                .getResponseBody());
+        assertThat(openApi).doesNotContain("\"effectiveDate\"");
     }
 
     private CareerResponse create(String token, CareerGame game, String driverName) {
