@@ -38,7 +38,7 @@ public class IdentityWebConfiguration {
     ) {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(properties.allowedOrigins());
-        configuration.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET", "POST", "PATCH", "OPTIONS"));
         configuration.setAllowedHeaders(List.of(
                 HttpHeaders.CONTENT_TYPE,
                 HttpHeaders.AUTHORIZATION,

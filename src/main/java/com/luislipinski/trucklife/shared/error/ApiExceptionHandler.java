@@ -16,9 +16,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
@@ -141,6 +143,20 @@ public class ApiExceptionHandler {
                 "MALFORMED_REQUEST",
                 "Malformed request",
                 "The request body could not be read",
+                request
+        );
+    }
+
+    @ExceptionHandler({
+            MissingServletRequestParameterException.class,
+            MethodArgumentTypeMismatchException.class
+    })
+    ProblemDetail handleInvalidRequestParameter(Exception exception, HttpServletRequest request) {
+        return problem(
+                HttpStatus.BAD_REQUEST,
+                "INVALID_REQUEST_PARAMETER",
+                "Invalid request parameter",
+                "One or more request parameters are missing or invalid",
                 request
         );
     }
