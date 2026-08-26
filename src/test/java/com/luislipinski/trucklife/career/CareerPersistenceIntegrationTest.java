@@ -99,9 +99,9 @@ class CareerPersistenceIntegrationTest {
         ));
 
         List<CareerEntity> ownerAtsCareers =
-                careerRepository.findAllByUserIdAndGameOrderByCreatedAtAsc(ownerId, CareerGame.ATS);
+                careerRepository.findAllByUserIdAndGameOrderByCreatedAtAscIdAsc(ownerId, CareerGame.ATS);
         List<CareerEntity> ownerEts2Careers =
-                careerRepository.findAllByUserIdAndGameOrderByCreatedAtAsc(ownerId, CareerGame.ETS2);
+                careerRepository.findAllByUserIdAndGameOrderByCreatedAtAscIdAsc(ownerId, CareerGame.ETS2);
 
         assertThat(ownerAtsCareers)
                 .extracting(CareerEntity::getId)

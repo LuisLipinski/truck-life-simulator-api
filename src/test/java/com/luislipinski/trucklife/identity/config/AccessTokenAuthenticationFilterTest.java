@@ -80,6 +80,47 @@ class AccessTokenAuthenticationFilterTest {
     }
 
     @Test
+    void protectsTheCareerCollectionEndpoint() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/careers");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(problemWriter).write(
+                request,
+                response,
+                HttpStatus.UNAUTHORIZED,
+                "AUTHENTICATION_REQUIRED",
+                "Authentication required",
+                "A Bearer access token is required"
+        );
+        verify(chain, never()).doFilter(any(), any());
+    }
+
+    @Test
+    void protectsAnIndividualCareerEndpoint() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest(
+                "PATCH",
+                "/api/v1/careers/1a91469a-cd99-4e26-af96-7a7d891cf443"
+        );
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        verify(problemWriter).write(
+                request,
+                response,
+                HttpStatus.UNAUTHORIZED,
+                "AUTHENTICATION_REQUIRED",
+                "Authentication required",
+                "A Bearer access token is required"
+        );
+        verify(chain, never()).doFilter(any(), any());
+    }
+
+    @Test
     void rejectsATokenWhenThePersistedRoleNoLongerMatches() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();

@@ -257,4 +257,10 @@ public class CareerEntity {
     public long getVersion() {
         return version;
     }
+
+    public void updateProfile(String driverName, String biography, Instant updatedAt) {
+        this.driverName = driverName;
+        this.biography = biography;
+        this.updatedAt = updatedAt;
+    }
 }
