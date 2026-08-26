@@ -75,6 +75,15 @@ class PostgresMigrationTest {
                 """,
                 String.class
         );
+        List<String> careerColumns = jdbcTemplate.queryForList(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'careers'
+                """,
+                String.class
+        );
 
         assertThat(tableCount).isEqualTo(5);
         assertThat(schemaVersion).isEqualTo("1");
@@ -89,6 +98,10 @@ class PostgresMigrationTest {
                 "idx_user_action_tokens_expires_at",
                 "idx_careers_user_game_created_at",
                 "idx_careers_updated_at"
+        );
+        assertThat(careerColumns).contains(
+                "default_truck_make",
+                "default_truck_model"
         );
     }
 
