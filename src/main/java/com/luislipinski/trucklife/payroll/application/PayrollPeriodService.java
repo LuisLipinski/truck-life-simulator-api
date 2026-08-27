@@ -9,7 +9,6 @@ import com.luislipinski.trucklife.shared.error.ApiProblemException;
 import com.luislipinski.trucklife.shared.error.ResourceNotFoundException;
 import java.time.Clock;
 import java.time.Instant;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -26,17 +25,20 @@ public class PayrollPeriodService implements PayrollPeriodOperations {
 
     private final CareerRepository careerRepository;
     private final PayrollPeriodRepository payrollPeriodRepository;
+    private final PayrollContextSnapshotFactory contextSnapshotFactory;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public PayrollPeriodService(
             CareerRepository careerRepository,
             PayrollPeriodRepository payrollPeriodRepository,
+            PayrollContextSnapshotFactory contextSnapshotFactory,
             ObjectMapper objectMapper,
             Clock clock
     ) {
         this.careerRepository = careerRepository;
         this.payrollPeriodRepository = payrollPeriodRepository;
+        this.contextSnapshotFactory = contextSnapshotFactory;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -80,13 +82,24 @@ public class PayrollPeriodService implements PayrollPeriodOperations {
             );
         }
 
+        Map<String, Object> authoritativeContext;
+        try {
+            authoritativeContext = contextSnapshotFactory.from(career);
+        } catch (IllegalArgumentException exception) {
+            throw conflict(
+                    "PAYROLL_POLICY_UNAVAILABLE",
+                    "Payroll policy unavailable",
+                    exception.getMessage()
+            );
+        }
+
         Instant now = clock.instant();
         PayrollPeriodEntity period = new PayrollPeriodEntity(
                 UUID.randomUUID(),
                 career.getId(),
                 currentWeek,
                 payrollMonth,
-                json(contextSnapshot(career)),
+                json(authoritativeContext),
                 now
         );
 
@@ -119,37 +132,12 @@ public class PayrollPeriodService implements PayrollPeriodOperations {
                 ));
     }
 
-    private Map<String, Object> contextSnapshot(CareerEntity career) {
-        Map<String, Object> snapshot = new LinkedHashMap<>();
-        snapshot.put("currentLevel", career.getCurrentLevel());
-        snapshot.put("companyName", textOrEmpty(career.getCompanyName()));
-        snapshot.put("stateCode", textOrEmpty(career.getStateCode()));
-        snapshot.put("countryCode", textOrEmpty(career.getCountryCode()));
-        snapshot.put("baseCity", career.getBaseCity());
-        snapshot.put("baseCurrency", career.getBaseCurrency());
-        snapshot.put("displayCurrency", career.getDisplayCurrency());
-        snapshot.put("exchangeRate", career.getExchangeRate());
-        snapshot.put(
-                "exchangeRateAsOf",
-                career.getExchangeRateAsOf() == null ? "" : career.getExchangeRateAsOf().toString()
-        );
-        snapshot.put("cityMarketVersion", career.getCityMarketVersion());
-        snapshot.put("cityMarketLabel", career.getCityMarketLabel());
-        snapshot.put("cityCostFactor", career.getCityCostFactor());
-        snapshot.put("citySalaryFactor", career.getCitySalaryFactor());
-        return snapshot;
-    }
-
     private String json(Map<String, Object> value) {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JacksonException exception) {
             throw new IllegalStateException("Payroll period snapshot could not be serialized", exception);
         }
-    }
-
-    private String textOrEmpty(String value) {
-        return value == null ? "" : value;
     }
 
     private ApiProblemException conflict(String code, String title, String detail) {
