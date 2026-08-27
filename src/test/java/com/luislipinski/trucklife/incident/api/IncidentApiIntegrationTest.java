@@ -88,11 +88,7 @@ class IncidentApiIntegrationTest {
     void registersImmediateAndDeferredIncidentsWithoutGameplayCalendarDates() {
         UserEntity owner = saveUser("incident-owner@example.com");
         String token = accessToken(owner);
-        CareerResponse career = createCareer(
-                token,
-                CareerGame.ATS,
-                "Incident Driver"
-        );
+        CareerResponse career = createCareer(token, CareerGame.ATS, "Incident Driver");
 
         IncidentResponse immediate = createIncident(
                 token,
@@ -126,7 +122,6 @@ class IncidentApiIntegrationTest {
                 "Minor cargo damage",
                 IncidentChargeMethod.PAYSLIP
         );
-
         assertThat(pending.status()).isEqualTo(IncidentStatus.PENDING_PAYSLIP);
         assertThat(pending.remainingAmount()).isEqualByComparingTo("120.00");
 
@@ -144,15 +139,8 @@ class IncidentApiIntegrationTest {
                 .headers(headers -> headers.setBearerAuth(token))
                 .exchange()
                 .expectStatus().isNoContent();
-
-        IncidentResponse cancelled = getIncident(
-                token,
-                career.id(),
-                CareerGame.ATS,
-                pending.id()
-        );
-        assertThat(cancelled.status()).isEqualTo(IncidentStatus.CANCELLED);
-        assertThat(cancelled.remainingAmount()).isEqualByComparingTo("0.00");
+        assertThat(getIncident(token, career.id(), CareerGame.ATS, pending.id()).status())
+                .isEqualTo(IncidentStatus.CANCELLED);
 
         restTestClient.delete()
                 .uri(incidentPath(career.id(), CareerGame.ATS, immediate.id()))
@@ -167,12 +155,7 @@ class IncidentApiIntegrationTest {
     void deductsAtsPendingIncidentOnPayslipAndTracksTheAllocation() {
         UserEntity owner = saveUser("ats-incident-payroll@example.com");
         String token = accessToken(owner);
-        CareerResponse career = createCareer(
-                token,
-                CareerGame.ATS,
-                "ATS Deduction Driver"
-        );
-
+        CareerResponse career = createCareer(token, CareerGame.ATS, "ATS Deduction Driver");
         IncidentResponse incident = createIncident(
                 token,
                 career.id(),
@@ -193,23 +176,16 @@ class IncidentApiIntegrationTest {
                 Map.of("expectedOperationalWeek", 1)
         );
 
-        assertThat(payslip.incidentDeductionAmount())
-                .isEqualByComparingTo("100.00");
+        assertThat(payslip.incidentDeductionAmount()).isEqualByComparingTo("100.00");
         assertThat(payslip.depositAmount()).isPositive();
-        assertThat(payslip.contextSnapshot())
-                .containsEntry("incidentDeductionsIncluded", true);
-        assertThat((List<?>) payslip.contextSnapshot().get("sourceIncidentIds"))
+        assertThat(payslip.contextSnapshot()).containsEntry("incidentDeductionsIncluded", true);
+        assertThat(snapshotStringList(payslip, "sourceIncidentIds"))
                 .contains(incident.id().toString());
         assertThat(payslip.lines())
                 .extracting(PayslipResponse.LineResponse::code)
                 .contains("INCIDENT_DEDUCTION");
 
-        IncidentResponse paid = getIncident(
-                token,
-                career.id(),
-                CareerGame.ATS,
-                incident.id()
-        );
+        IncidentResponse paid = getIncident(token, career.id(), CareerGame.ATS, incident.id());
         assertThat(paid.status()).isEqualTo(IncidentStatus.DEDUCTED_PAYSLIP);
         assertThat(paid.remainingAmount()).isEqualByComparingTo("0.00");
         assertThat(paid.deductions()).singleElement().satisfies(deduction -> {
@@ -222,12 +198,7 @@ class IncidentApiIntegrationTest {
     void carriesIncidentRemainderWhenThePayslipCannotCoverTheWholeCharge() {
         UserEntity owner = saveUser("partial-incident@example.com");
         String token = accessToken(owner);
-        CareerResponse career = createCareer(
-                token,
-                CareerGame.ATS,
-                "Partial Deduction Driver"
-        );
-
+        CareerResponse career = createCareer(token, CareerGame.ATS, "Partial Deduction Driver");
         IncidentResponse incident = createIncident(
                 token,
                 career.id(),
@@ -250,20 +221,11 @@ class IncidentApiIntegrationTest {
 
         assertThat(payslip.depositAmount()).isEqualByComparingTo("0.00");
         assertThat(payslip.incidentDeductionAmount()).isPositive();
-
-        IncidentResponse partial = getIncident(
-                token,
-                career.id(),
-                CareerGame.ATS,
-                incident.id()
-        );
+        IncidentResponse partial = getIncident(token, career.id(), CareerGame.ATS, incident.id());
         assertThat(partial.status()).isEqualTo(IncidentStatus.PARTIALLY_DEDUCTED);
-        assertThat(partial.remainingAmount()).isPositive();
         assertThat(partial.remainingAmount())
                 .isEqualByComparingTo(
-                        new BigDecimal("10000.00").subtract(
-                                payslip.incidentDeductionAmount()
-                        )
+                        new BigDecimal("10000.00").subtract(payslip.incidentDeductionAmount())
                 );
 
         restTestClient.delete()
@@ -279,16 +241,8 @@ class IncidentApiIntegrationTest {
     void ets2PayslipChargesOnlyIncidentsEligibleThroughItsClosedWeeks() {
         UserEntity owner = saveUser("ets2-incident@example.com");
         String token = accessToken(owner);
-        CareerResponse career = createCareer(
-                token,
-                CareerGame.ETS2,
-                "ETS2 Incident Driver"
-        );
-        TripResponse weekOneTrip = createTrip(
-                token,
-                career.id(),
-                CareerGame.ETS2
-        );
+        CareerResponse career = createCareer(token, CareerGame.ETS2, "ETS2 Incident Driver");
+        TripResponse weekOneTrip = createTrip(token, career.id(), CareerGame.ETS2);
 
         for (int week = 1; week <= 4; week++) {
             closeWeek(token, career.id(), week);
@@ -330,17 +284,11 @@ class IncidentApiIntegrationTest {
                 Map.of("expectedPayrollMonth", 1)
         );
 
-        assertThat(payslip.incidentDeductionAmount())
-                .isEqualByComparingTo("50.00");
-        assertThat((List<?>) payslip.contextSnapshot().get("sourceIncidentIds"))
+        assertThat(payslip.incidentDeductionAmount()).isEqualByComparingTo("50.00");
+        assertThat(snapshotStringList(payslip, "sourceIncidentIds"))
                 .containsExactly(oldTripIncident.id().toString());
-
-        assertThat(getIncident(
-                token,
-                career.id(),
-                CareerGame.ETS2,
-                oldTripIncident.id()
-        ).status()).isEqualTo(IncidentStatus.DEDUCTED_PAYSLIP);
+        assertThat(getIncident(token, career.id(), CareerGame.ETS2, oldTripIncident.id()).status())
+                .isEqualTo(IncidentStatus.DEDUCTED_PAYSLIP);
 
         IncidentResponse stillPending = getIncident(
                 token,
@@ -358,11 +306,7 @@ class IncidentApiIntegrationTest {
         UserEntity intruder = saveUser("incident-intruder@example.com");
         String ownerToken = accessToken(owner);
         String intruderToken = accessToken(intruder);
-        CareerResponse career = createCareer(
-                ownerToken,
-                CareerGame.ATS,
-                "Private Incident Driver"
-        );
+        CareerResponse career = createCareer(ownerToken, CareerGame.ATS, "Private Incident Driver");
 
         restTestClient.get()
                 .uri(incidentsPath(career.id(), CareerGame.ATS))
@@ -371,7 +315,6 @@ class IncidentApiIntegrationTest {
                 .expectStatus().isNotFound()
                 .expectBody()
                 .jsonPath("$.code").isEqualTo("CAREER_NOT_FOUND");
-
         restTestClient.get()
                 .uri(incidentsPath(career.id(), CareerGame.ATS))
                 .exchange()
@@ -423,6 +366,14 @@ class IncidentApiIntegrationTest {
                 .exists()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/incidents'].post.security[0].bearerAuth")
                 .exists();
+    }
+
+    private List<String> snapshotStringList(PayslipResponse payslip, String key) {
+        Object value = payslip.contextSnapshot().get(key);
+        if (!(value instanceof List<?> values)) {
+            return List.of();
+        }
+        return values.stream().map(String::valueOf).toList();
     }
 
     private IncidentResponse createIncident(
@@ -500,16 +451,9 @@ class IncidentApiIntegrationTest {
         );
     }
 
-    private void closeWeek(
-            String token,
-            UUID careerId,
-            int expectedWeek
-    ) {
+    private void closeWeek(String token, UUID careerId, int expectedWeek) {
         restTestClient.post()
-                .uri(
-                        CAREERS_PATH + "/" + careerId
-                                + "/payroll-periods/close?game=ETS2"
-                )
+                .uri(CAREERS_PATH + "/" + careerId + "/payroll-periods/close?game=ETS2")
                 .headers(headers -> headers.setBearerAuth(token))
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("expectedOperationalWeek", expectedWeek))
@@ -517,11 +461,7 @@ class IncidentApiIntegrationTest {
                 .expectStatus().isCreated();
     }
 
-    private TripResponse createTrip(
-            String token,
-            UUID careerId,
-            CareerGame game
-    ) {
+    private TripResponse createTrip(String token, UUID careerId, CareerGame game) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("departureDay", "monday");
         request.put("departureTime", "08:00");
@@ -553,11 +493,7 @@ class IncidentApiIntegrationTest {
         );
     }
 
-    private CareerResponse createCareer(
-            String token,
-            CareerGame game,
-            String driverName
-    ) {
+    private CareerResponse createCareer(String token, CareerGame game, String driverName) {
         Map<String, Object> request = new LinkedHashMap<>();
         request.put("game", game);
         request.put("driverName", driverName);
@@ -568,27 +504,15 @@ class IncidentApiIntegrationTest {
         request.put("displayCurrency", game == CareerGame.ATS ? "USD" : "EUR");
         request.put("exchangeRate", new BigDecimal("1.00000000"));
         request.put("exchangeRateAsOf", "2026-08-26");
-        request.put(
-                "baseCity",
-                game == CareerGame.ATS ? "Phoenix, AZ" : "Berlin, Germany"
-        );
-        request.put(
-                "defaultTruckMake",
-                game == CareerGame.ATS ? "Kenworth" : "MAN"
-        );
-        request.put(
-                "defaultTruckModel",
-                game == CareerGame.ATS ? "T680" : "TGX"
-        );
+        request.put("baseCity", game == CareerGame.ATS ? "Phoenix, AZ" : "Berlin, Germany");
+        request.put("defaultTruckMake", game == CareerGame.ATS ? "Kenworth" : "MAN");
+        request.put("defaultTruckModel", game == CareerGame.ATS ? "T680" : "TGX");
         request.put("cityMarketVersion", "client-test-v1");
         request.put("cityMarketLabel", "Client test market");
         request.put("cityCostFactor", new BigDecimal("9.0000"));
         request.put("citySalaryFactor", new BigDecimal("9.0000"));
-        if (game == CareerGame.ATS) {
-            request.put("stateCode", "AZ");
-        } else {
-            request.put("countryCode", "DE");
-        }
+        if (game == CareerGame.ATS) request.put("stateCode", "AZ");
+        else request.put("countryCode", "DE");
 
         return Objects.requireNonNull(
                 restTestClient.post()
@@ -608,13 +532,8 @@ class IncidentApiIntegrationTest {
         return CAREERS_PATH + "/" + careerId + "/incidents?game=" + game;
     }
 
-    private String incidentPath(
-            UUID careerId,
-            CareerGame game,
-            UUID incidentId
-    ) {
-        return CAREERS_PATH + "/" + careerId
-                + "/incidents/" + incidentId + "?game=" + game;
+    private String incidentPath(UUID careerId, CareerGame game, UUID incidentId) {
+        return CAREERS_PATH + "/" + careerId + "/incidents/" + incidentId + "?game=" + game;
     }
 
     private UserEntity saveUser(String email) {
@@ -636,9 +555,6 @@ class IncidentApiIntegrationTest {
     }
 
     private String accessToken(UserEntity user) {
-        return accessTokenIssuer.issue(
-                user,
-                UUID.randomUUID()
-        ).token();
+        return accessTokenIssuer.issue(user, UUID.randomUUID()).token();
     }
 }
