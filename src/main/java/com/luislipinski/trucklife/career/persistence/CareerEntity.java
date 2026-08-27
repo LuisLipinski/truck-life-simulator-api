@@ -39,6 +39,7 @@ public class CareerEntity {
     @Column(name = "city_salary_factor", precision = 8, scale = 4) private BigDecimal citySalaryFactor;
     @Column(name = "current_operational_week", nullable = false) private int currentOperationalWeek;
     @Column(name = "current_payroll_month") private Integer currentPayrollMonth;
+    @Column(name = "dangerous_goods_qualified", nullable = false) private boolean dangerousGoodsQualified;
     @Column(name = "created_at", nullable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     @Version @Column(nullable = false) private long version;
@@ -71,6 +72,7 @@ public class CareerEntity {
     public String getCityMarketVersion(){return cityMarketVersion;} public String getCityMarketLabel(){return cityMarketLabel;}
     public BigDecimal getCityCostFactor(){return cityCostFactor;} public BigDecimal getCitySalaryFactor(){return citySalaryFactor;}
     public int getCurrentOperationalWeek(){return currentOperationalWeek;} public Integer getCurrentPayrollMonth(){return currentPayrollMonth;}
+    public boolean isDangerousGoodsQualified(){return dangerousGoodsQualified;}
     public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;} public long getVersion(){return version;}
 
     public void updateProfile(String driverName, String biography, Instant updatedAt) {
@@ -102,6 +104,19 @@ public class CareerEntity {
             throw new IllegalArgumentException("Balance debit must be non-negative");
         }
         this.balance=this.balance.subtract(amount); this.updatedAt=updatedAt;
+    }
+
+    public void promoteTo(short targetLevel, Instant updatedAt) {
+        if (targetLevel != this.currentLevel + 1 || targetLevel < 2 || targetLevel > 3) {
+            throw new IllegalArgumentException("Career promotion must advance exactly one level");
+        }
+        this.currentLevel = targetLevel;
+        this.updatedAt = updatedAt;
+    }
+
+    public void qualifyDangerousGoods(Instant updatedAt) {
+        this.dangerousGoodsQualified = true;
+        this.updatedAt = updatedAt;
     }
 
     public void advanceOperationalWeek(Instant updatedAt) {

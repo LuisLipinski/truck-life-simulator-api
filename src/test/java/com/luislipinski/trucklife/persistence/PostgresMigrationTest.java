@@ -35,7 +35,8 @@ class PostgresMigrationTest {
                 SELECT COUNT(*) FROM information_schema.tables
                 WHERE table_schema='public' AND table_name IN (
                   'platform_metadata','users','refresh_tokens','user_action_tokens','careers','career_events','trips',
-                  'payroll_periods','payslips','payslip_lines','incidents','incident_payslip_deductions')
+                  'payroll_periods','payslips','payslip_lines','incidents','incident_payslip_deductions',
+                  'academy_progress','qualifications')
                 """, Integer.class);
         String schemaVersion = jdbcTemplate.queryForObject(
                 "SELECT metadata_value FROM platform_metadata WHERE metadata_key='schema_version'",
@@ -50,7 +51,8 @@ class PostgresMigrationTest {
                 SELECT indexname FROM pg_indexes
                 WHERE schemaname='public' AND tablename IN (
                   'users','refresh_tokens','user_action_tokens','careers','career_events','trips',
-                  'payroll_periods','payslips','payslip_lines','incidents','incident_payslip_deductions')
+                  'payroll_periods','payslips','payslip_lines','incidents','incident_payslip_deductions',
+                  'academy_progress','qualifications')
                 """, String.class);
 
         List<String> careerColumns = columns("careers");
@@ -61,6 +63,8 @@ class PostgresMigrationTest {
         List<String> payslipLineColumns = columns("payslip_lines");
         List<String> incidentColumns = columns("incidents");
         List<String> incidentDeductionColumns = columns("incident_payslip_deductions");
+        List<String> academyColumns = columns("academy_progress");
+        List<String> qualificationColumns = columns("qualifications");
 
         List<String> careerConstraints = constraints("careers");
         List<String> payrollPeriodConstraints = constraints("payroll_periods");
@@ -68,6 +72,8 @@ class PostgresMigrationTest {
         List<String> payslipLineConstraints = constraints("payslip_lines");
         List<String> incidentConstraints = constraints("incidents");
         List<String> incidentDeductionConstraints = constraints("incident_payslip_deductions");
+        List<String> academyConstraints = constraints("academy_progress");
+        List<String> qualificationConstraints = constraints("qualifications");
 
         List<String> currencyColumns = jdbcTemplate.queryForList("""
                 SELECT column_name || ':' || data_type || ':' || character_maximum_length
@@ -77,9 +83,9 @@ class PostgresMigrationTest {
                 ORDER BY column_name
                 """, String.class);
 
-        assertThat(tableCount).isEqualTo(12);
+        assertThat(tableCount).isEqualTo(14);
         assertThat(schemaVersion).isEqualTo("1");
-        assertThat(latestMigration).isEqualTo("9");
+        assertThat(latestMigration).isEqualTo("10");
         assertThat(indexes).contains(
                 "uq_users_normalized_email",
                 "idx_users_status",
@@ -100,7 +106,9 @@ class PostgresMigrationTest {
                 "idx_payslip_lines_payslip_order",
                 "idx_incidents_career_recorded_at",
                 "idx_incidents_pending_payslip",
-                "idx_incident_deductions_payslip"
+                "idx_incident_deductions_payslip",
+                "idx_academy_progress_career_completed",
+                "idx_qualifications_career_acquired"
         );
         assertThat(indexes).doesNotContain("idx_career_events_career_effective_date");
 
@@ -108,7 +116,8 @@ class PostgresMigrationTest {
                 "default_truck_make",
                 "default_truck_model",
                 "current_operational_week",
-                "current_payroll_month"
+                "current_payroll_month",
+                "dangerous_goods_qualified"
         );
         assertThat(eventColumns).contains(
                 "career_id",
@@ -205,6 +214,33 @@ class PostgresMigrationTest {
                 "amount",
                 "recorded_at"
         );
+        assertThat(academyColumns).contains(
+                "id",
+                "career_id",
+                "target_level",
+                "module_code",
+                "module_name",
+                "required_distance",
+                "distance_at_completion",
+                "fee_amount",
+                "display_currency",
+                "operational_week",
+                "policy_version",
+                "context_snapshot_json",
+                "completed_at"
+        );
+        assertThat(qualificationColumns).contains(
+                "id",
+                "career_id",
+                "qualification_type",
+                "qualification_name",
+                "fee_amount",
+                "display_currency",
+                "operational_week",
+                "policy_version",
+                "context_snapshot_json",
+                "acquired_at"
+        );
 
         assertThat(careerConstraints)
                 .contains("chk_careers_payroll_month_context")
@@ -251,6 +287,27 @@ class PostgresMigrationTest {
                 "fk_incident_deductions_payslip",
                 "chk_incident_deductions_amount",
                 "uq_incident_deductions_incident_payslip"
+        );
+        assertThat(academyConstraints).contains(
+                "fk_academy_progress_career",
+                "chk_academy_progress_target_level",
+                "chk_academy_progress_module",
+                "chk_academy_progress_distance",
+                "chk_academy_progress_fee",
+                "chk_academy_progress_currency",
+                "chk_academy_progress_week",
+                "chk_academy_progress_snapshot",
+                "uq_academy_progress_career_level"
+        );
+        assertThat(qualificationConstraints).contains(
+                "fk_qualifications_career",
+                "chk_qualifications_type",
+                "chk_qualifications_name",
+                "chk_qualifications_fee",
+                "chk_qualifications_currency",
+                "chk_qualifications_week",
+                "chk_qualifications_snapshot",
+                "uq_qualifications_career_type"
         );
         assertThat(currencyColumns).containsExactly(
                 "base_currency:character varying:3",
