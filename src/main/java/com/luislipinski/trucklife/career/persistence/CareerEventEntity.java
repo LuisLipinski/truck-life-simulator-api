@@ -7,8 +7,8 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.time.DayOfWeek;
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.UUID;
 
 @Entity
@@ -25,8 +25,12 @@ public class CareerEventEntity {
     @Column(name = "event_type", nullable = false, length = 40)
     private CareerEventType type;
 
-    @Column(name = "effective_date", nullable = false)
-    private LocalDate effectiveDate;
+    @Column(name = "operational_week", nullable = false)
+    private int operationalWeek;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "effective_day", length = 9)
+    private DayOfWeek effectiveDay;
 
     @Column(name = "recorded_at", nullable = false)
     private Instant recordedAt;
@@ -41,14 +45,16 @@ public class CareerEventEntity {
             UUID id,
             UUID careerId,
             CareerEventType type,
-            LocalDate effectiveDate,
+            int operationalWeek,
+            DayOfWeek effectiveDay,
             Instant recordedAt,
             String changesJson
     ) {
         this.id = id;
         this.careerId = careerId;
         this.type = type;
-        this.effectiveDate = effectiveDate;
+        this.operationalWeek = operationalWeek;
+        this.effectiveDay = effectiveDay;
         this.recordedAt = recordedAt;
         this.changesJson = changesJson;
     }
@@ -65,8 +71,12 @@ public class CareerEventEntity {
         return type;
     }
 
-    public LocalDate getEffectiveDate() {
-        return effectiveDate;
+    public int getOperationalWeek() {
+        return operationalWeek;
+    }
+
+    public DayOfWeek getEffectiveDay() {
+        return effectiveDay;
     }
 
     public Instant getRecordedAt() {

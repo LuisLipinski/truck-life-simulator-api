@@ -12,7 +12,7 @@ import java.time.LocalDate;
 
 public record ChangeCareerBaseRequest(
         @NotNull @PositiveOrZero Long version,
-        @NotNull LocalDate effectiveDate,
+        @NotBlank @Size(max = 9) String effectiveDay,
         @Size(max = 10) String stateCode,
         @Size(max = 10) String countryCode,
         @NotBlank @Size(max = 160) String baseCity,
@@ -28,7 +28,7 @@ public record ChangeCareerBaseRequest(
     ChangeCareerBaseCommand toCommand() {
         return new ChangeCareerBaseCommand(
                 version,
-                effectiveDate,
+                effectiveDay,
                 stateCode,
                 countryCode,
                 baseCity,

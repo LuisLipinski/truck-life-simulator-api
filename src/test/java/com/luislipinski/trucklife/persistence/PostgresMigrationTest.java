@@ -118,7 +118,7 @@ class PostgresMigrationTest {
 
         assertThat(tableCount).isEqualTo(7);
         assertThat(schemaVersion).isEqualTo("1");
-        assertThat(latestMigration).isEqualTo("5");
+        assertThat(latestMigration).isEqualTo("6");
         assertThat(indexes).contains(
                 "uq_users_normalized_email",
                 "idx_users_status",
@@ -129,9 +129,10 @@ class PostgresMigrationTest {
                 "idx_user_action_tokens_expires_at",
                 "idx_careers_user_game_created_at",
                 "idx_careers_updated_at",
-                "idx_career_events_career_effective_date",
+                "idx_career_events_career_week_recorded_at",
                 "idx_trips_career_week_created_at"
         );
+        assertThat(indexes).doesNotContain("idx_career_events_career_effective_date");
         assertThat(careerColumns).contains(
                 "default_truck_make",
                 "default_truck_model"
@@ -139,10 +140,12 @@ class PostgresMigrationTest {
         assertThat(eventColumns).contains(
                 "career_id",
                 "event_type",
-                "effective_date",
+                "operational_week",
+                "effective_day",
                 "recorded_at",
                 "changes_json"
         );
+        assertThat(eventColumns).doesNotContain("effective_date");
         assertThat(tripColumns).contains(
                 "career_id",
                 "operational_week",

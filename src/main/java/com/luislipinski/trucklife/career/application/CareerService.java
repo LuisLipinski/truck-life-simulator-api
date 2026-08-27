@@ -11,6 +11,7 @@ import com.luislipinski.trucklife.shared.error.ApiProblemException;
 import com.luislipinski.trucklife.shared.error.ResourceNotFoundException;
 import java.math.BigDecimal;
 import java.time.Clock;
+import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.util.LinkedHashMap;
@@ -141,7 +142,8 @@ public class CareerService implements CareerOperations {
         recordEvent(
                 career.getId(),
                 CareerEventType.PROFILE_UPDATED,
-                command.effectiveDate() == null ? LocalDate.now(clock) : command.effectiveDate(),
+                career.getCurrentOperationalWeek(),
+                null,
                 now,
                 changes
         );
@@ -158,6 +160,7 @@ public class CareerService implements CareerOperations {
     ) {
         CareerEntity career = ownedCareer(userId, game, careerId);
         requireCurrentVersion(career, command.version());
+        DayOfWeek effectiveDay = effectiveDay(command.effectiveDay());
         String companyName = command.companyName().strip();
         if (Objects.equals(career.getCompanyName(), companyName)) {
             return career;
@@ -173,7 +176,8 @@ public class CareerService implements CareerOperations {
         recordEvent(
                 career.getId(),
                 CareerEventType.EMPLOYER_CHANGED,
-                command.effectiveDate(),
+                career.getCurrentOperationalWeek(),
+                effectiveDay,
                 now,
                 changes
         );
@@ -190,6 +194,7 @@ public class CareerService implements CareerOperations {
     ) {
         CareerEntity career = ownedCareer(userId, game, careerId);
         requireCurrentVersion(career, command.version());
+        DayOfWeek effectiveDay = effectiveDay(command.effectiveDay());
 
         String stateCode = null;
         String countryCode = null;
@@ -239,7 +244,8 @@ public class CareerService implements CareerOperations {
         recordEvent(
                 career.getId(),
                 CareerEventType.BASE_CHANGED,
-                command.effectiveDate(),
+                career.getCurrentOperationalWeek(),
+                effectiveDay,
                 now,
                 Map.of("base", change(previousBase, nextBase))
         );
@@ -250,7 +256,7 @@ public class CareerService implements CareerOperations {
     @Transactional(readOnly = true)
     public List<CareerEventEntity> listEvents(UUID userId, CareerGame game, UUID careerId) {
         CareerEntity career = ownedCareer(userId, game, careerId);
-        return eventRepository.findAllByCareerIdOrderByEffectiveDateAscRecordedAtAscIdAsc(career.getId());
+        return eventRepository.findAllByCareerIdOrderByOperationalWeekAscRecordedAtAscIdAsc(career.getId());
     }
 
     private CareerEntity ownedCareer(UUID userId, CareerGame game, UUID careerId) {
@@ -278,7 +284,8 @@ public class CareerService implements CareerOperations {
     private void recordEvent(
             UUID careerId,
             CareerEventType type,
-            LocalDate effectiveDate,
+            int operationalWeek,
+            DayOfWeek effectiveDay,
             Instant recordedAt,
             Map<String, Object> changes
     ) {
@@ -287,7 +294,8 @@ public class CareerService implements CareerOperations {
                     UUID.randomUUID(),
                     careerId,
                     type,
-                    effectiveDate,
+                    operationalWeek,
+                    effectiveDay,
                     recordedAt,
                     objectMapper.writeValueAsString(changes)
             ));
@@ -353,6 +361,19 @@ public class CareerService implements CareerOperations {
         value.put("previous", previous);
         value.put("next", next);
         return value;
+    }
+
+    private DayOfWeek effectiveDay(String value) {
+        try {
+            return DayOfWeek.valueOf(value.strip().toUpperCase(Locale.ROOT));
+        } catch (IllegalArgumentException | NullPointerException exception) {
+            throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "CAREER_EFFECTIVE_DAY_INVALID",
+                    "Career effective day invalid",
+                    "effectiveDay must be one of monday through sunday"
+            );
+        }
     }
 
     private String requiredLocation(String value, String field, CareerGame game) {
