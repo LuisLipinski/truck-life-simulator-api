@@ -96,12 +96,18 @@ class PayslipApiIntegrationTest {
 
         assertThat(payslip.operationalWeek()).isEqualTo(1);
         assertThat(payslip.payrollMonth()).isNull();
-        assertThat(payslip.grossAmount()).isEqualByComparingTo("1104.00");
+        assertThat(payslip.grossAmount()).isEqualByComparingTo("1159.20");
         assertThat(payslip.benefitsAmount()).isEqualByComparingTo("36.00");
         assertThat(payslip.perDiemAmount()).isEqualByComparingTo("160.00");
         assertThat(payslip.overrunMinutes()).isEqualTo(480);
-        assertThat(payslip.contextSnapshot()).containsEntry("policyVersion", "phase1-payroll-2026-v1");
-        assertThat(payslip.contextSnapshot()).containsEntry("incidentDeductionsIncluded", false);
+        assertThat(payslip.contextSnapshot())
+                .containsEntry("policyVersion", "phase1-payroll-2026-v1")
+                .containsEntry("cityMarketVersion", "1")
+                .containsEntry("cityMarketKey", "major")
+                .containsEntry("cityMarketKnown", true)
+                .containsEntry("incidentDeductionsIncluded", false);
+        assertThat(new BigDecimal(String.valueOf(payslip.contextSnapshot().get("citySalaryFactor"))))
+                .isEqualByComparingTo("1.05");
         assertThat(payslip.lines()).extracting(PayslipResponse.LineResponse::code)
                 .contains("BASE_SALARY", "ROUTE_OVERRUN", "PER_DIEM", "BENEFITS");
 
