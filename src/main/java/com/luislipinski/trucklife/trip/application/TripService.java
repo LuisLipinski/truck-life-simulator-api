@@ -49,7 +49,7 @@ public class TripService implements TripOperations {
     @Override
     @Transactional
     public TripEntity create(UUID userId, CareerGame game, UUID careerId, CreateTripCommand command) {
-        CareerEntity career = ownedCareer(userId, game, careerId);
+        CareerEntity career = lockedOwnedCareer(userId, game, careerId);
         DayOfWeek departureDay = day(command.departureDay(), "departureDay");
         DayOfWeek arrivalDay = day(command.arrivalDay(), "arrivalDay");
         long elapsedMinutes = elapsedMinutes(
@@ -63,15 +63,29 @@ public class TripService implements TripOperations {
         TripPaymentCategory category = paymentCategory(type, command.paymentCategory());
         String cargo = type == TripType.DEADHEAD ? null : optional(command.cargo());
         if (type == TripType.LOADED && category == TripPaymentCategory.DEADHEAD) {
-            throw problem("TRIP_PAYMENT_CATEGORY_INVALID", "Trip payment category invalid", "Loaded trips cannot use the deadhead payment category");
+            throw problem(
+                    "TRIP_PAYMENT_CATEGORY_INVALID",
+                    "Trip payment category invalid",
+                    "Loaded trips cannot use the deadhead payment category"
+            );
         }
-        if (career.getCurrentLevel() <= 1 && type == TripType.LOADED && category != TripPaymentCategory.NORMAL) {
-            throw problem("TRIP_PAYMENT_CATEGORY_INVALID", "Trip payment category invalid", "Level 1 careers can only use the normal loaded category");
+        if (career.getCurrentLevel() <= 1
+                && type == TripType.LOADED
+                && category != TripPaymentCategory.NORMAL) {
+            throw problem(
+                    "TRIP_PAYMENT_CATEGORY_INVALID",
+                    "Trip payment category invalid",
+                    "Level 1 careers can only use the normal loaded category"
+            );
         }
 
         Integer breakMinutes = command.breakMinutes();
         if (breakMinutes != null && breakMinutes >= elapsedMinutes) {
-            throw problem("TRIP_BREAK_INVALID", "Trip break invalid", "Break minutes must be lower than the elapsed trip time");
+            throw problem(
+                    "TRIP_BREAK_INVALID",
+                    "Trip break invalid",
+                    "Break minutes must be lower than the elapsed trip time"
+            );
         }
         validateOdometer(command.odometerStart(), command.odometerEnd());
 
@@ -114,7 +128,11 @@ public class TripService implements TripOperations {
             return tripRepository.findAllByCareerIdOrderByOperationalWeekAscCreatedAtAscIdAsc(career.getId());
         }
         if (operationalWeek <= 0) {
-            throw problem("TRIP_WEEK_INVALID", "Trip week invalid", "operationalWeek must be greater than zero");
+            throw problem(
+                    "TRIP_WEEK_INVALID",
+                    "Trip week invalid",
+                    "operationalWeek must be greater than zero"
+            );
         }
         return tripRepository.findAllByCareerIdAndOperationalWeekOrderByCreatedAtAscIdAsc(
                 career.getId(),
@@ -133,6 +151,14 @@ public class TripService implements TripOperations {
                 ));
     }
 
+    private CareerEntity lockedOwnedCareer(UUID userId, CareerGame game, UUID careerId) {
+        return careerRepository.findForUpdateByIdAndUserIdAndGame(careerId, userId, game)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "CAREER_NOT_FOUND",
+                        "The requested career does not exist"
+                ));
+    }
+
     private CareerEntity ownedCareer(UUID userId, CareerGame game, UUID careerId) {
         return careerRepository.findByIdAndUserIdAndGame(careerId, userId, game)
                 .orElseThrow(() -> new ResourceNotFoundException(
@@ -145,7 +171,11 @@ public class TripService implements TripOperations {
         try {
             return DayOfWeek.valueOf(value.strip().toUpperCase(Locale.ROOT));
         } catch (RuntimeException exception) {
-            throw problem("TRIP_SCHEDULE_INVALID", "Trip schedule invalid", field + " must be a valid weekday");
+            throw problem(
+                    "TRIP_SCHEDULE_INVALID",
+                    "Trip schedule invalid",
+                    field + " must be a valid weekday"
+            );
         }
     }
 
@@ -176,7 +206,11 @@ public class TripService implements TripOperations {
         try {
             return TripType.valueOf(value.strip().toUpperCase(Locale.ROOT));
         } catch (RuntimeException exception) {
-            throw problem("TRIP_TYPE_INVALID", "Trip type invalid", "type must be LOADED or DEADHEAD");
+            throw problem(
+                    "TRIP_TYPE_INVALID",
+                    "Trip type invalid",
+                    "type must be LOADED or DEADHEAD"
+            );
         }
     }
 
@@ -190,16 +224,28 @@ public class TripService implements TripOperations {
         try {
             return TripPaymentCategory.valueOf(value.strip().toUpperCase(Locale.ROOT));
         } catch (RuntimeException exception) {
-            throw problem("TRIP_PAYMENT_CATEGORY_INVALID", "Trip payment category invalid", "Unknown payment category");
+            throw problem(
+                    "TRIP_PAYMENT_CATEGORY_INVALID",
+                    "Trip payment category invalid",
+                    "Unknown payment category"
+            );
         }
     }
 
     private void validateOdometer(BigDecimal start, BigDecimal end) {
         if ((start == null) != (end == null)) {
-            throw problem("TRIP_ODOMETER_INVALID", "Trip odometer invalid", "Both odometer readings must be provided together");
+            throw problem(
+                    "TRIP_ODOMETER_INVALID",
+                    "Trip odometer invalid",
+                    "Both odometer readings must be provided together"
+            );
         }
         if (start != null && (start.signum() < 0 || end.signum() < 0 || end.compareTo(start) < 0)) {
-            throw problem("TRIP_ODOMETER_INVALID", "Trip odometer invalid", "Odometer end must be greater than or equal to odometer start");
+            throw problem(
+                    "TRIP_ODOMETER_INVALID",
+                    "Trip odometer invalid",
+                    "Odometer end must be greater than or equal to odometer start"
+            );
         }
     }
 
@@ -213,7 +259,10 @@ public class TripService implements TripOperations {
         snapshot.put("currency", textOrEmpty(career.getDisplayCurrency()));
         snapshot.put("baseCurrency", textOrEmpty(career.getBaseCurrency()));
         snapshot.put("exchangeRate", career.getExchangeRate());
-        snapshot.put("exchangeRateAsOf", career.getExchangeRateAsOf() == null ? "" : career.getExchangeRateAsOf().toString());
+        snapshot.put(
+                "exchangeRateAsOf",
+                career.getExchangeRateAsOf() == null ? "" : career.getExchangeRateAsOf().toString()
+        );
         snapshot.put("cityMarketVersion", career.getCityMarketVersion());
         snapshot.put("cityMarketLabel", career.getCityMarketLabel());
         snapshot.put("cityCostFactor", career.getCityCostFactor());
@@ -231,7 +280,11 @@ public class TripService implements TripOperations {
 
     private String required(String value, String field) {
         if (value == null || value.isBlank()) {
-            throw problem("TRIP_DATA_INVALID", "Trip data invalid", field + " is required");
+            throw problem(
+                    "TRIP_DATA_INVALID",
+                    "Trip data invalid",
+                    field + " is required"
+            );
         }
         return value.strip();
     }

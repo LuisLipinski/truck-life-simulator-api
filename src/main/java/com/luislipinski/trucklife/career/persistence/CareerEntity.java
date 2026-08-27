@@ -154,109 +154,32 @@ public class CareerEntity {
         this.updatedAt = updatedAt;
     }
 
-    public UUID getId() {
-        return id;
-    }
-
-    public UUID getUserId() {
-        return userId;
-    }
-
-    public CareerGame getGame() {
-        return game;
-    }
-
-    public String getDriverName() {
-        return driverName;
-    }
-
-    public String getCompanyName() {
-        return companyName;
-    }
-
-    public String getBiography() {
-        return biography;
-    }
-
-    public short getCurrentLevel() {
-        return currentLevel;
-    }
-
-    public BigDecimal getBalance() {
-        return balance;
-    }
-
-    public String getBaseCurrency() {
-        return baseCurrency;
-    }
-
-    public String getDisplayCurrency() {
-        return displayCurrency;
-    }
-
-    public BigDecimal getExchangeRate() {
-        return exchangeRate;
-    }
-
-    public LocalDate getExchangeRateAsOf() {
-        return exchangeRateAsOf;
-    }
-
-    public String getStateCode() {
-        return stateCode;
-    }
-
-    public String getCountryCode() {
-        return countryCode;
-    }
-
-    public String getBaseCity() {
-        return baseCity;
-    }
-
-    public String getDefaultTruckMake() {
-        return defaultTruckMake;
-    }
-
-    public String getDefaultTruckModel() {
-        return defaultTruckModel;
-    }
-
-    public String getCityMarketVersion() {
-        return cityMarketVersion;
-    }
-
-    public String getCityMarketLabel() {
-        return cityMarketLabel;
-    }
-
-    public BigDecimal getCityCostFactor() {
-        return cityCostFactor;
-    }
-
-    public BigDecimal getCitySalaryFactor() {
-        return citySalaryFactor;
-    }
-
-    public int getCurrentOperationalWeek() {
-        return currentOperationalWeek;
-    }
-
-    public Integer getCurrentPayrollMonth() {
-        return currentPayrollMonth;
-    }
-
-    public Instant getCreatedAt() {
-        return createdAt;
-    }
-
-    public Instant getUpdatedAt() {
-        return updatedAt;
-    }
-
-    public long getVersion() {
-        return version;
-    }
+    public UUID getId() { return id; }
+    public UUID getUserId() { return userId; }
+    public CareerGame getGame() { return game; }
+    public String getDriverName() { return driverName; }
+    public String getCompanyName() { return companyName; }
+    public String getBiography() { return biography; }
+    public short getCurrentLevel() { return currentLevel; }
+    public BigDecimal getBalance() { return balance; }
+    public String getBaseCurrency() { return baseCurrency; }
+    public String getDisplayCurrency() { return displayCurrency; }
+    public BigDecimal getExchangeRate() { return exchangeRate; }
+    public LocalDate getExchangeRateAsOf() { return exchangeRateAsOf; }
+    public String getStateCode() { return stateCode; }
+    public String getCountryCode() { return countryCode; }
+    public String getBaseCity() { return baseCity; }
+    public String getDefaultTruckMake() { return defaultTruckMake; }
+    public String getDefaultTruckModel() { return defaultTruckModel; }
+    public String getCityMarketVersion() { return cityMarketVersion; }
+    public String getCityMarketLabel() { return cityMarketLabel; }
+    public BigDecimal getCityCostFactor() { return cityCostFactor; }
+    public BigDecimal getCitySalaryFactor() { return citySalaryFactor; }
+    public int getCurrentOperationalWeek() { return currentOperationalWeek; }
+    public Integer getCurrentPayrollMonth() { return currentPayrollMonth; }
+    public Instant getCreatedAt() { return createdAt; }
+    public Instant getUpdatedAt() { return updatedAt; }
+    public long getVersion() { return version; }
 
     public void updateProfile(String driverName, String biography, Instant updatedAt) {
         this.driverName = driverName;
@@ -292,6 +215,11 @@ public class CareerEntity {
         this.cityMarketLabel = cityMarketLabel;
         this.cityCostFactor = cityCostFactor;
         this.citySalaryFactor = citySalaryFactor;
+        this.updatedAt = updatedAt;
+    }
+
+    public void advanceOperationalWeek(Instant updatedAt) {
+        this.currentOperationalWeek += 1;
         this.updatedAt = updatedAt;
     }
 }

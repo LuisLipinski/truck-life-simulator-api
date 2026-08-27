@@ -11,9 +11,9 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.client.RestTestClient;
-import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
+import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
@@ -48,7 +48,8 @@ class PostgresMigrationTest {
                     'user_action_tokens',
                     'careers',
                     'career_events',
-                    'trips'
+                    'trips',
+                    'payroll_periods'
                   )
                 """,
                 Integer.class
@@ -73,7 +74,15 @@ class PostgresMigrationTest {
                 SELECT indexname
                 FROM pg_indexes
                 WHERE schemaname = 'public'
-                  AND tablename IN ('users', 'refresh_tokens', 'user_action_tokens', 'careers', 'career_events', 'trips')
+                  AND tablename IN (
+                    'users',
+                    'refresh_tokens',
+                    'user_action_tokens',
+                    'careers',
+                    'career_events',
+                    'trips',
+                    'payroll_periods'
+                  )
                 """,
                 String.class
         );
@@ -104,6 +113,31 @@ class PostgresMigrationTest {
                 """,
                 String.class
         );
+        List<String> payrollPeriodColumns = jdbcTemplate.queryForList(
+                """
+                SELECT column_name
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                  AND table_name = 'payroll_periods'
+                """,
+                String.class
+        );
+        List<String> careerConstraints = jdbcTemplate.queryForList(
+                """
+                SELECT conname
+                FROM pg_constraint
+                WHERE conrelid = 'careers'::regclass
+                """,
+                String.class
+        );
+        List<String> payrollPeriodConstraints = jdbcTemplate.queryForList(
+                """
+                SELECT conname
+                FROM pg_constraint
+                WHERE conrelid = 'payroll_periods'::regclass
+                """,
+                String.class
+        );
         List<String> currencyColumns = jdbcTemplate.queryForList(
                 """
                 SELECT column_name || ':' || data_type || ':' || character_maximum_length
@@ -116,9 +150,9 @@ class PostgresMigrationTest {
                 String.class
         );
 
-        assertThat(tableCount).isEqualTo(7);
+        assertThat(tableCount).isEqualTo(8);
         assertThat(schemaVersion).isEqualTo("1");
-        assertThat(latestMigration).isEqualTo("6");
+        assertThat(latestMigration).isEqualTo("7");
         assertThat(indexes).contains(
                 "uq_users_normalized_email",
                 "idx_users_status",
@@ -130,12 +164,15 @@ class PostgresMigrationTest {
                 "idx_careers_user_game_created_at",
                 "idx_careers_updated_at",
                 "idx_career_events_career_week_recorded_at",
-                "idx_trips_career_week_created_at"
+                "idx_trips_career_week_created_at",
+                "idx_payroll_periods_career_month_week"
         );
         assertThat(indexes).doesNotContain("idx_career_events_career_effective_date");
         assertThat(careerColumns).contains(
                 "default_truck_make",
-                "default_truck_model"
+                "default_truck_model",
+                "current_operational_week",
+                "current_payroll_month"
         );
         assertThat(eventColumns).contains(
                 "career_id",
@@ -162,6 +199,23 @@ class PostgresMigrationTest {
                 "source",
                 "employer_snapshot_json",
                 "base_snapshot_json"
+        );
+        assertThat(payrollPeriodColumns).contains(
+                "id",
+                "career_id",
+                "operational_week",
+                "payroll_month",
+                "context_snapshot_json",
+                "closed_at"
+        );
+        assertThat(careerConstraints)
+                .contains("chk_careers_payroll_month_context")
+                .doesNotContain("chk_careers_payroll_month");
+        assertThat(payrollPeriodConstraints).contains(
+                "fk_payroll_periods_career",
+                "chk_payroll_periods_operational_week",
+                "chk_payroll_periods_payroll_month",
+                "uq_payroll_periods_career_week"
         );
         assertThat(currencyColumns).containsExactly(
                 "base_currency:character varying:3",
