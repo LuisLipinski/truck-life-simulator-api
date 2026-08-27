@@ -13,6 +13,7 @@ spring:
     clean-disabled: true
 
 server:
+  address: 0.0.0.0
   port: ${PORT:8080}
   forward-headers-strategy: native
 
