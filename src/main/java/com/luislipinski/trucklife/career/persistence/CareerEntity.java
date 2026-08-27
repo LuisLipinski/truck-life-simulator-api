@@ -59,6 +59,7 @@ public class CareerEntity {
         this.cityCostFactor=cityCostFactor; this.citySalaryFactor=citySalaryFactor; this.currentOperationalWeek=currentOperationalWeek;
         this.currentPayrollMonth=currentPayrollMonth; this.createdAt=createdAt; this.updatedAt=updatedAt;
     }
+
     public UUID getId(){return id;} public UUID getUserId(){return userId;} public CareerGame getGame(){return game;}
     public String getDriverName(){return driverName;} public String getCompanyName(){return companyName;}
     public String getBiography(){return biography;} public short getCurrentLevel(){return currentLevel;}
@@ -75,7 +76,11 @@ public class CareerEntity {
     public void updateProfile(String driverName, String biography, Instant updatedAt) {
         this.driverName=driverName; this.biography=biography; this.updatedAt=updatedAt;
     }
-    public void changeEmployer(String companyName, Instant updatedAt) { this.companyName=companyName; this.updatedAt=updatedAt; }
+
+    public void changeEmployer(String companyName, Instant updatedAt) {
+        this.companyName=companyName; this.updatedAt=updatedAt;
+    }
+
     public void changeBase(String stateCode, String countryCode, String baseCity, String baseCurrency,
                            BigDecimal exchangeRate, LocalDate exchangeRateAsOf, String cityMarketVersion,
                            String cityMarketLabel, BigDecimal cityCostFactor, BigDecimal citySalaryFactor, Instant updatedAt) {
@@ -84,14 +89,29 @@ public class CareerEntity {
         this.cityMarketLabel=cityMarketLabel; this.cityCostFactor=cityCostFactor; this.citySalaryFactor=citySalaryFactor;
         this.updatedAt=updatedAt;
     }
+
     public void creditBalance(BigDecimal amount, Instant updatedAt) {
-        if (amount == null || amount.signum() < 0) throw new IllegalArgumentException("Payslip credit must be non-negative");
+        if (amount == null || amount.signum() < 0) {
+            throw new IllegalArgumentException("Payslip credit must be non-negative");
+        }
         this.balance=this.balance.add(amount); this.updatedAt=updatedAt;
     }
-    public void advanceOperationalWeek(Instant updatedAt) { this.currentOperationalWeek += 1; this.updatedAt=updatedAt; }
+
+    public void debitBalance(BigDecimal amount, Instant updatedAt) {
+        if (amount == null || amount.signum() < 0) {
+            throw new IllegalArgumentException("Balance debit must be non-negative");
+        }
+        this.balance=this.balance.subtract(amount); this.updatedAt=updatedAt;
+    }
+
+    public void advanceOperationalWeek(Instant updatedAt) {
+        this.currentOperationalWeek += 1; this.updatedAt=updatedAt;
+    }
+
     public void advancePayrollMonth(Instant updatedAt) {
-        if (this.currentPayrollMonth == null || this.currentPayrollMonth < 1)
+        if (this.currentPayrollMonth == null || this.currentPayrollMonth < 1) {
             throw new IllegalStateException("Only ETS2 careers have an operational payroll month");
+        }
         this.currentPayrollMonth += 1; this.updatedAt=updatedAt;
     }
 }
