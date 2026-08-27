@@ -88,7 +88,7 @@ class ProgressionApiIntegrationTest {
         promoteExpectConflict(token, career.id(), CareerGame.ATS, 1, 1, 2, "PROMOTION_DISTANCE_REQUIRED");
         createTrip(token, career.id(), CareerGame.ATS, "NORMAL", "10000.00", 201);
 
-        restTestClient.post().uri(progressionPath(career.id(), CareerGame.ATS) + "/promotions")
+        restTestClient.post().uri(progressionActionPath(career.id(), CareerGame.ATS, "promotions"))
                 .headers(h -> h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("expectedOperationalWeek", 1, "expectedCurrentLevel", 1, "targetLevel", 2, "academyCompleted", false))
                 .exchange().expectStatus().isBadRequest().expectBody().jsonPath("$.code").isEqualTo("VALIDATION_FAILED");
@@ -183,13 +183,13 @@ class ProgressionApiIntegrationTest {
                 .exchange().expectStatus().isNotFound().expectBody().jsonPath("$.code").isEqualTo("CAREER_NOT_FOUND");
         restTestClient.get().uri(progressionPath(career.id(), CareerGame.ATS)).exchange().expectStatus().isUnauthorized();
 
-        restTestClient.post().uri(progressionPath(career.id(), CareerGame.ATS) + "/dangerous-goods")
+        restTestClient.post().uri(progressionActionPath(career.id(), CareerGame.ATS, "dangerous-goods"))
                 .headers(h -> h.setBearerAuth(ownerToken)).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("expectedOperationalWeek", 2, "expectedCurrentLevel", 1))
                 .exchange().expectStatus().isEqualTo(409).expectBody().jsonPath("$.code").isEqualTo("PROGRESSION_WEEK_CONFLICT");
 
         createTrip(ownerToken, career.id(), CareerGame.ATS, "NORMAL", "10000.00", 201);
-        restTestClient.post().uri(progressionPath(career.id(), CareerGame.ATS) + "/promotions")
+        restTestClient.post().uri(progressionActionPath(career.id(), CareerGame.ATS, "promotions"))
                 .headers(h -> h.setBearerAuth(ownerToken)).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("expectedOperationalWeek", 1, "expectedCurrentLevel", 1, "targetLevel", 2, "academyCompleted", true))
                 .exchange().expectStatus().isEqualTo(409).expectBody().jsonPath("$.code").isEqualTo("PROGRESSION_BALANCE_INSUFFICIENT");
@@ -203,7 +203,7 @@ class ProgressionApiIntegrationTest {
     private int concurrentPromotionStatus(String token, UUID careerId, CountDownLatch ready, CountDownLatch start) throws Exception {
         ready.countDown();
         assertThat(start.await(10, TimeUnit.SECONDS)).isTrue();
-        return restTestClient.post().uri(progressionPath(careerId, CareerGame.ATS) + "/promotions")
+        return restTestClient.post().uri(progressionActionPath(careerId, CareerGame.ATS, "promotions"))
                 .headers(h -> h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("expectedOperationalWeek", 1, "expectedCurrentLevel", 1, "targetLevel", 2, "academyCompleted", true))
                 .exchange().expectBody().returnResult().getStatus().value();
@@ -217,7 +217,7 @@ class ProgressionApiIntegrationTest {
     }
 
     private ProgressionResponse promote(String token, UUID careerId, CareerGame game, int week, int level, int target) {
-        return Objects.requireNonNull(restTestClient.post().uri(progressionPath(careerId, game) + "/promotions")
+        return Objects.requireNonNull(restTestClient.post().uri(progressionActionPath(careerId, game, "promotions"))
                 .headers(h -> h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("expectedOperationalWeek", week, "expectedCurrentLevel", level, "targetLevel", target, "academyCompleted", true))
                 .exchange().expectStatus().isCreated().expectHeader().valueEquals(HttpHeaders.CACHE_CONTROL, "no-store")
@@ -225,14 +225,14 @@ class ProgressionApiIntegrationTest {
     }
 
     private void promoteExpectConflict(String token, UUID careerId, CareerGame game, int week, int level, int target, String code) {
-        restTestClient.post().uri(progressionPath(careerId, game) + "/promotions")
+        restTestClient.post().uri(progressionActionPath(careerId, game, "promotions"))
                 .headers(h -> h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("expectedOperationalWeek", week, "expectedCurrentLevel", level, "targetLevel", target, "academyCompleted", true))
                 .exchange().expectStatus().isEqualTo(409).expectBody().jsonPath("$.code").isEqualTo(code);
     }
 
     private ProgressionResponse acquireDangerous(String token, UUID careerId, CareerGame game, int week, int level) {
-        return Objects.requireNonNull(restTestClient.post().uri(progressionPath(careerId, game) + "/dangerous-goods")
+        return Objects.requireNonNull(restTestClient.post().uri(progressionActionPath(careerId, game, "dangerous-goods"))
                 .headers(h -> h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON)
                 .body(Map.of("expectedOperationalWeek", week, "expectedCurrentLevel", level))
                 .exchange().expectStatus().isCreated().expectBody(ProgressionResponse.class).returnResult().getResponseBody());
@@ -276,6 +276,10 @@ class ProgressionApiIntegrationTest {
 
     private String progressionPath(UUID careerId, CareerGame game) {
         return CAREERS_PATH + "/" + careerId + "/progression?game=" + game;
+    }
+
+    private String progressionActionPath(UUID careerId, CareerGame game, String action) {
+        return CAREERS_PATH + "/" + careerId + "/progression/" + action + "?game=" + game;
     }
 
     private UserEntity saveUser(String email) {
