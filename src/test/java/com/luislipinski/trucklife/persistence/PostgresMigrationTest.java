@@ -21,223 +21,83 @@ import org.testcontainers.utility.DockerImageName;
 @ActiveProfiles("test")
 @Testcontainers
 class PostgresMigrationTest {
-
-    @Container
-    @ServiceConnection
-    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(
-            DockerImageName.parse("postgres:18-alpine")
-    );
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
-
-    @Autowired
-    private RestTestClient restTestClient;
+    @Container @ServiceConnection
+    static final PostgreSQLContainer POSTGRES = new PostgreSQLContainer(DockerImageName.parse("postgres:18-alpine"));
+    @Autowired private JdbcTemplate jdbcTemplate;
+    @Autowired private RestTestClient restTestClient;
 
     @Test
     void appliesTheVersionedFlywayMigrations() {
-        Integer tableCount = jdbcTemplate.queryForObject(
-                """
-                SELECT COUNT(*)
-                FROM information_schema.tables
-                WHERE table_schema = 'public'
-                  AND table_name IN (
-                    'platform_metadata',
-                    'users',
-                    'refresh_tokens',
-                    'user_action_tokens',
-                    'careers',
-                    'career_events',
-                    'trips',
-                    'payroll_periods'
-                  )
-                """,
-                Integer.class
-        );
+        Integer tableCount = jdbcTemplate.queryForObject("""
+                SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN (
+                  'platform_metadata','users','refresh_tokens','user_action_tokens','careers','career_events','trips',
+                  'payroll_periods','payslips','payslip_lines')
+                """, Integer.class);
         String schemaVersion = jdbcTemplate.queryForObject(
-                "SELECT metadata_value FROM platform_metadata WHERE metadata_key = 'schema_version'",
-                String.class
-        );
-
-        String latestMigration = jdbcTemplate.queryForObject(
-                """
-                SELECT version
-                FROM flyway_schema_history
-                WHERE success = TRUE AND version IS NOT NULL
-                ORDER BY installed_rank DESC
-                LIMIT 1
-                """,
-                String.class
-        );
-        List<String> indexes = jdbcTemplate.queryForList(
-                """
-                SELECT indexname
-                FROM pg_indexes
-                WHERE schemaname = 'public'
-                  AND tablename IN (
-                    'users',
-                    'refresh_tokens',
-                    'user_action_tokens',
-                    'careers',
-                    'career_events',
-                    'trips',
-                    'payroll_periods'
-                  )
-                """,
-                String.class
-        );
-        List<String> careerColumns = jdbcTemplate.queryForList(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND table_name = 'careers'
-                """,
-                String.class
-        );
-        List<String> eventColumns = jdbcTemplate.queryForList(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND table_name = 'career_events'
-                """,
-                String.class
-        );
-        List<String> tripColumns = jdbcTemplate.queryForList(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND table_name = 'trips'
-                """,
-                String.class
-        );
-        List<String> payrollPeriodColumns = jdbcTemplate.queryForList(
-                """
-                SELECT column_name
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND table_name = 'payroll_periods'
-                """,
-                String.class
-        );
-        List<String> careerConstraints = jdbcTemplate.queryForList(
-                """
-                SELECT conname
-                FROM pg_constraint
-                WHERE conrelid = 'careers'::regclass
-                """,
-                String.class
-        );
-        List<String> payrollPeriodConstraints = jdbcTemplate.queryForList(
-                """
-                SELECT conname
-                FROM pg_constraint
-                WHERE conrelid = 'payroll_periods'::regclass
-                """,
-                String.class
-        );
-        List<String> currencyColumns = jdbcTemplate.queryForList(
-                """
+                "SELECT metadata_value FROM platform_metadata WHERE metadata_key='schema_version'", String.class);
+        String latestMigration = jdbcTemplate.queryForObject("""
+                SELECT version FROM flyway_schema_history WHERE success=TRUE AND version IS NOT NULL
+                ORDER BY installed_rank DESC LIMIT 1
+                """, String.class);
+        List<String> indexes = jdbcTemplate.queryForList("""
+                SELECT indexname FROM pg_indexes WHERE schemaname='public' AND tablename IN (
+                  'users','refresh_tokens','user_action_tokens','careers','career_events','trips','payroll_periods','payslips','payslip_lines')
+                """, String.class);
+        List<String> careerColumns=columns("careers"), eventColumns=columns("career_events"), tripColumns=columns("trips"),
+                payrollPeriodColumns=columns("payroll_periods"), payslipColumns=columns("payslips"),
+                payslipLineColumns=columns("payslip_lines");
+        List<String> careerConstraints=constraints("careers"), payrollPeriodConstraints=constraints("payroll_periods"),
+                payslipConstraints=constraints("payslips"), payslipLineConstraints=constraints("payslip_lines");
+        List<String> currencyColumns=jdbcTemplate.queryForList("""
                 SELECT column_name || ':' || data_type || ':' || character_maximum_length
-                FROM information_schema.columns
-                WHERE table_schema = 'public'
-                  AND table_name = 'careers'
-                  AND column_name IN ('base_currency', 'display_currency')
-                ORDER BY column_name
-                """,
-                String.class
-        );
+                FROM information_schema.columns WHERE table_schema='public' AND table_name='careers'
+                  AND column_name IN ('base_currency','display_currency') ORDER BY column_name
+                """, String.class);
 
-        assertThat(tableCount).isEqualTo(8);
+        assertThat(tableCount).isEqualTo(10);
         assertThat(schemaVersion).isEqualTo("1");
-        assertThat(latestMigration).isEqualTo("7");
-        assertThat(indexes).contains(
-                "uq_users_normalized_email",
-                "idx_users_status",
-                "idx_refresh_tokens_user_id",
-                "idx_refresh_tokens_family_id",
-                "idx_refresh_tokens_expires_at",
-                "idx_user_action_tokens_user_purpose",
-                "idx_user_action_tokens_expires_at",
-                "idx_careers_user_game_created_at",
-                "idx_careers_updated_at",
-                "idx_career_events_career_week_recorded_at",
-                "idx_trips_career_week_created_at",
-                "idx_payroll_periods_career_month_week"
-        );
+        assertThat(latestMigration).isEqualTo("8");
+        assertThat(indexes).contains("uq_users_normalized_email","idx_users_status","idx_refresh_tokens_user_id",
+                "idx_refresh_tokens_family_id","idx_refresh_tokens_expires_at","idx_user_action_tokens_user_purpose",
+                "idx_user_action_tokens_expires_at","idx_careers_user_game_created_at","idx_careers_updated_at",
+                "idx_career_events_career_week_recorded_at","idx_trips_career_week_created_at",
+                "idx_payroll_periods_career_month_week","idx_payroll_periods_payslip_id","uq_payslips_ats_week",
+                "uq_payslips_ets2_month","idx_payslips_career_generated_at","idx_payslip_lines_payslip_order");
         assertThat(indexes).doesNotContain("idx_career_events_career_effective_date");
-        assertThat(careerColumns).contains(
-                "default_truck_make",
-                "default_truck_model",
-                "current_operational_week",
-                "current_payroll_month"
-        );
-        assertThat(eventColumns).contains(
-                "career_id",
-                "event_type",
-                "operational_week",
-                "effective_day",
-                "recorded_at",
-                "changes_json"
-        );
+        assertThat(careerColumns).contains("default_truck_make","default_truck_model","current_operational_week","current_payroll_month");
+        assertThat(eventColumns).contains("career_id","event_type","operational_week","effective_day","recorded_at","changes_json");
         assertThat(eventColumns).doesNotContain("effective_date");
-        assertThat(tripColumns).contains(
-                "career_id",
-                "operational_week",
-                "departure_day",
-                "departure_time",
-                "arrival_day",
-                "arrival_time",
-                "official_distance",
-                "break_minutes",
-                "truck_make",
-                "truck_model",
-                "odometer_start",
-                "odometer_end",
-                "source",
-                "employer_snapshot_json",
-                "base_snapshot_json"
-        );
-        assertThat(payrollPeriodColumns).contains(
-                "id",
-                "career_id",
-                "operational_week",
-                "payroll_month",
-                "context_snapshot_json",
-                "closed_at"
-        );
-        assertThat(careerConstraints)
-                .contains("chk_careers_payroll_month_context")
-                .doesNotContain("chk_careers_payroll_month");
-        assertThat(payrollPeriodConstraints).contains(
-                "fk_payroll_periods_career",
-                "chk_payroll_periods_operational_week",
-                "chk_payroll_periods_payroll_month",
-                "uq_payroll_periods_career_week"
-        );
-        assertThat(currencyColumns).containsExactly(
-                "base_currency:character varying:3",
-                "display_currency:character varying:3"
-        );
+        assertThat(tripColumns).contains("career_id","operational_week","departure_day","departure_time","arrival_day","arrival_time",
+                "official_distance","break_minutes","truck_make","truck_model","odometer_start","odometer_end","source",
+                "employer_snapshot_json","base_snapshot_json");
+        assertThat(payrollPeriodColumns).contains("id","career_id","operational_week","payroll_month","payslip_id","context_snapshot_json","closed_at");
+        assertThat(payslipColumns).contains("id","career_id","game_id","operational_week","payroll_month","start_operational_week",
+                "end_operational_week","level","display_currency","gross_amount","tax_amount","benefits_amount","per_diem_amount",
+                "net_salary_amount","deposit_amount","total_distance","elapsed_minutes","break_minutes","worked_minutes","overrun_minutes",
+                "context_snapshot_json","generated_at");
+        assertThat(payslipLineColumns).contains("id","payslip_id","line_order","code","label","line_type","amount","quantity","rate","metadata_json");
+        assertThat(careerConstraints).contains("chk_careers_payroll_month_context").doesNotContain("chk_careers_payroll_month");
+        assertThat(payrollPeriodConstraints).contains("fk_payroll_periods_career","fk_payroll_periods_payslip",
+                "chk_payroll_periods_operational_week","chk_payroll_periods_payroll_month","uq_payroll_periods_career_week");
+        assertThat(payslipConstraints).contains("fk_payslips_career","chk_payslips_game","chk_payslips_period_context",
+                "chk_payslips_week_range","chk_payslips_level","chk_payslips_nonnegative_amounts","chk_payslips_minutes");
+        assertThat(payslipLineConstraints).contains("fk_payslip_lines_payslip","chk_payslip_lines_type","chk_payslip_lines_amount","uq_payslip_lines_order");
+        assertThat(currencyColumns).containsExactly("base_currency:character varying:3","display_currency:character varying:3");
     }
 
     @Test
     void exposesHealthAndOpenApiContracts() {
-        restTestClient.get()
-                .uri("/actuator/health")
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
+        restTestClient.get().uri("/actuator/health").exchange().expectStatus().isOk().expectBody()
                 .jsonPath("$.status").isEqualTo("UP");
+        restTestClient.get().uri("/v3/api-docs").exchange().expectStatus().isOk().expectBody()
+                .jsonPath("$.openapi").exists().jsonPath("$.info.title").isEqualTo("Truck Life Simulator API");
+    }
 
-        restTestClient.get()
-                .uri("/v3/api-docs")
-                .exchange()
-                .expectStatus().isOk()
-                .expectBody()
-                .jsonPath("$.openapi").exists()
-                .jsonPath("$.info.title").isEqualTo("Truck Life Simulator API");
+    private List<String> columns(String table) {
+        return jdbcTemplate.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=?",
+                String.class, table);
+    }
+    private List<String> constraints(String table) {
+        return jdbcTemplate.queryForList("SELECT conname FROM pg_constraint WHERE conrelid=to_regclass(?)", String.class, table);
     }
 }
