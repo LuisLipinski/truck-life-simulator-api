@@ -49,7 +49,7 @@ public class TripService implements TripOperations {
     @Override
     @Transactional
     public TripEntity create(UUID userId, CareerGame game, UUID careerId, CreateTripCommand command) {
-        CareerEntity career = ownedCareer(userId, game, careerId);
+        CareerEntity career = lockedOwnedCareer(userId, game, careerId);
         DayOfWeek departureDay = day(command.departureDay(), "departureDay");
         DayOfWeek arrivalDay = day(command.arrivalDay(), "arrivalDay");
         long elapsedMinutes = elapsedMinutes(
@@ -130,6 +130,14 @@ public class TripService implements TripOperations {
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "TRIP_NOT_FOUND",
                         "The requested trip does not exist"
+                ));
+    }
+
+    private CareerEntity lockedOwnedCareer(UUID userId, CareerGame game, UUID careerId) {
+        return careerRepository.findForUpdateByIdAndUserIdAndGame(careerId, userId, game)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "CAREER_NOT_FOUND",
+                        "The requested career does not exist"
                 ));
     }
 

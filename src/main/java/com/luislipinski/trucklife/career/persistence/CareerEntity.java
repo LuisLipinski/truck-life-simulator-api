@@ -294,4 +294,9 @@ public class CareerEntity {
         this.citySalaryFactor = citySalaryFactor;
         this.updatedAt = updatedAt;
     }
+
+    public void advanceOperationalWeek(Instant updatedAt) {
+        this.currentOperationalWeek += 1;
+        this.updatedAt = updatedAt;
+    }
 }
