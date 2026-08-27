@@ -3,6 +3,12 @@ package com.luislipinski.trucklife.payroll.application;
 import com.luislipinski.trucklife.career.domain.CareerGame;
 import com.luislipinski.trucklife.career.persistence.CareerEntity;
 import com.luislipinski.trucklife.career.persistence.CareerRepository;
+import com.luislipinski.trucklife.incident.domain.IncidentChargeMethod;
+import com.luislipinski.trucklife.incident.persistence.IncidentEntity;
+import com.luislipinski.trucklife.incident.persistence.IncidentPayslipDeductionEntity;
+import com.luislipinski.trucklife.incident.persistence.IncidentPayslipDeductionRepository;
+import com.luislipinski.trucklife.incident.persistence.IncidentRepository;
+import com.luislipinski.trucklife.payroll.domain.PayslipLineType;
 import com.luislipinski.trucklife.payroll.persistence.PayrollPeriodEntity;
 import com.luislipinski.trucklife.payroll.persistence.PayrollPeriodRepository;
 import com.luislipinski.trucklife.payroll.persistence.PayslipEntity;
@@ -41,6 +47,8 @@ public class PayslipService implements PayslipOperations {
     private final PayslipRepository payslipRepository;
     private final PayslipLineRepository payslipLineRepository;
     private final TripRepository tripRepository;
+    private final IncidentRepository incidentRepository;
+    private final IncidentPayslipDeductionRepository incidentDeductionRepository;
     private final PayrollCalculator calculator;
     private final PayrollContextSnapshotFactory contextSnapshotFactory;
     private final ObjectMapper objectMapper;
@@ -52,6 +60,8 @@ public class PayslipService implements PayslipOperations {
             PayslipRepository payslipRepository,
             PayslipLineRepository payslipLineRepository,
             TripRepository tripRepository,
+            IncidentRepository incidentRepository,
+            IncidentPayslipDeductionRepository incidentDeductionRepository,
             PayrollCalculator calculator,
             PayrollContextSnapshotFactory contextSnapshotFactory,
             ObjectMapper objectMapper,
@@ -62,6 +72,8 @@ public class PayslipService implements PayslipOperations {
         this.payslipRepository = payslipRepository;
         this.payslipLineRepository = payslipLineRepository;
         this.tripRepository = tripRepository;
+        this.incidentRepository = incidentRepository;
+        this.incidentDeductionRepository = incidentDeductionRepository;
         this.calculator = calculator;
         this.contextSnapshotFactory = contextSnapshotFactory;
         this.objectMapper = objectMapper;
@@ -83,7 +95,11 @@ public class PayslipService implements PayslipOperations {
                     ? generateAts(career, expectedOperationalWeek)
                     : generateEts2(career, expectedPayrollMonth);
         } catch (IllegalArgumentException exception) {
-            throw conflict("PAYSLIP_POLICY_UNAVAILABLE", "Payroll policy unavailable", exception.getMessage());
+            throw conflict(
+                    "PAYSLIP_POLICY_UNAVAILABLE",
+                    "Payroll policy unavailable",
+                    exception.getMessage()
+            );
         }
     }
 
@@ -91,7 +107,8 @@ public class PayslipService implements PayslipOperations {
     @Transactional(readOnly = true)
     public List<Result> list(UUID userId, CareerGame game, UUID careerId) {
         CareerEntity career = ownedCareer(userId, game, careerId);
-        return payslipRepository.findAllByCareerIdOrderByGeneratedAtDescIdDesc(career.getId()).stream()
+        return payslipRepository.findAllByCareerIdOrderByGeneratedAtDescIdDesc(career.getId())
+                .stream()
                 .map(this::result)
                 .toList();
     }
@@ -135,14 +152,24 @@ public class PayslipService implements PayslipOperations {
         Map<String, Object> periodContext = contextSnapshotFactory.from(career);
         PayrollCalculator.Context calculationContext = contextFrom(periodContext);
         List<TripEntity> trips = tripRepository
-                .findAllByCareerIdAndOperationalWeekOrderByCreatedAtAscIdAsc(career.getId(), currentWeek);
+                .findAllByCareerIdAndOperationalWeekOrderByCreatedAtAscIdAsc(
+                        career.getId(),
+                        currentWeek
+                );
         PayrollCalculator.Calculation calculation = calculator.calculate(
                 CareerGame.ATS,
                 calculationContext,
                 trips
         );
+        IncidentDeductionPlan incidentPlan = planIncidentDeductions(
+                career.getId(),
+                currentWeek,
+                calculation.deposit()
+        );
+        BigDecimal finalDeposit = calculation.deposit().subtract(incidentPlan.total());
         Instant now = clock.instant();
         UUID payslipId = UUID.randomUUID();
+
         PayslipEntity payslip = new PayslipEntity(
                 payslipId,
                 career.getId(),
@@ -158,13 +185,20 @@ public class PayslipService implements PayslipOperations {
                 calculation.benefits(),
                 calculation.perDiem(),
                 calculation.netSalary(),
-                calculation.deposit(),
+                incidentPlan.total(),
+                finalDeposit,
                 calculation.totalDistance(),
                 calculation.elapsedMinutes(),
                 calculation.breakMinutes(),
                 calculation.workedMinutes(),
                 calculation.overrunMinutes(),
-                json(payslipSnapshot(periodContext, List.of(currentWeek), List.of(), trips)),
+                json(payslipSnapshot(
+                        periodContext,
+                        List.of(currentWeek),
+                        List.of(),
+                        trips,
+                        incidentPlan
+                )),
                 now
         );
         payslipRepository.saveAndFlush(payslip);
@@ -180,8 +214,13 @@ public class PayslipService implements PayslipOperations {
         period.assignPayslip(payslipId);
         payrollPeriodRepository.saveAndFlush(period);
 
-        List<PayslipLineEntity> lines = saveLines(payslipId, calculation.lines());
-        career.creditBalance(calculation.deposit(), now);
+        applyIncidentDeductions(payslipId, incidentPlan, now);
+        List<PayslipLineEntity> lines = saveLines(
+                payslipId,
+                calculation.lines(),
+                incidentPlan
+        );
+        career.creditBalance(finalDeposit, now);
         career.advanceOperationalWeek(now);
         careerRepository.flush();
         return new Result(payslip, lines);
@@ -227,7 +266,9 @@ public class PayslipService implements PayslipOperations {
             );
         }
         if (periods.size() > ETS2_MAX_WEEKS_PER_PAYROLL_MONTH) {
-            throw new IllegalStateException("ETS2 payroll month cannot contain more than five closed weeks");
+            throw new IllegalStateException(
+                    "ETS2 payroll month cannot contain more than five closed weeks"
+            );
         }
         if (periods.stream().anyMatch(period -> period.getPayslipId() != null)) {
             throw conflict(
@@ -237,9 +278,13 @@ public class PayslipService implements PayslipOperations {
             );
         }
 
-        Map<String, Object> authoritativeContext = snapshot(periods.getLast().getContextSnapshotJson());
+        Map<String, Object> authoritativeContext = snapshot(
+                periods.getLast().getContextSnapshotJson()
+        );
         PayrollCalculator.Context calculationContext = contextFrom(authoritativeContext);
-        List<Integer> weeks = periods.stream().map(PayrollPeriodEntity::getOperationalWeek).toList();
+        List<Integer> weeks = periods.stream()
+                .map(PayrollPeriodEntity::getOperationalWeek)
+                .toList();
         List<TripEntity> trips = tripRepository
                 .findAllByCareerIdOrderByOperationalWeekAscCreatedAtAscIdAsc(career.getId())
                 .stream()
@@ -250,8 +295,15 @@ public class PayslipService implements PayslipOperations {
                 calculationContext,
                 trips
         );
+        IncidentDeductionPlan incidentPlan = planIncidentDeductions(
+                career.getId(),
+                weeks.getLast(),
+                calculation.deposit()
+        );
+        BigDecimal finalDeposit = calculation.deposit().subtract(incidentPlan.total());
         Instant now = clock.instant();
         UUID payslipId = UUID.randomUUID();
+
         PayslipEntity payslip = new PayslipEntity(
                 payslipId,
                 career.getId(),
@@ -267,24 +319,94 @@ public class PayslipService implements PayslipOperations {
                 calculation.benefits(),
                 calculation.perDiem(),
                 calculation.netSalary(),
-                calculation.deposit(),
+                incidentPlan.total(),
+                finalDeposit,
                 calculation.totalDistance(),
                 calculation.elapsedMinutes(),
                 calculation.breakMinutes(),
                 calculation.workedMinutes(),
                 calculation.overrunMinutes(),
-                json(payslipSnapshot(authoritativeContext, weeks, periods, trips)),
+                json(payslipSnapshot(
+                        authoritativeContext,
+                        weeks,
+                        periods,
+                        trips,
+                        incidentPlan
+                )),
                 now
         );
         payslipRepository.saveAndFlush(payslip);
 
         periods.forEach(period -> period.assignPayslip(payslipId));
         payrollPeriodRepository.saveAllAndFlush(periods);
-        List<PayslipLineEntity> lines = saveLines(payslipId, calculation.lines());
-        career.creditBalance(calculation.deposit(), now);
+        applyIncidentDeductions(payslipId, incidentPlan, now);
+        List<PayslipLineEntity> lines = saveLines(
+                payslipId,
+                calculation.lines(),
+                incidentPlan
+        );
+        career.creditBalance(finalDeposit, now);
         career.advancePayrollMonth(now);
         careerRepository.flush();
         return new Result(payslip, lines);
+    }
+
+    private IncidentDeductionPlan planIncidentDeductions(
+            UUID careerId,
+            int eligibleThroughWeek,
+            BigDecimal availableAmount
+    ) {
+        BigDecimal available = availableAmount.max(BigDecimal.ZERO);
+        BigDecimal total = BigDecimal.ZERO.setScale(2);
+        List<PlannedIncidentDeduction> deductions = new ArrayList<>();
+
+        List<IncidentEntity> pending = incidentRepository
+                .findAllByCareerIdAndChargeMethodAndRemainingAmountGreaterThanOrderByRecordedAtAscIdAsc(
+                        careerId,
+                        IncidentChargeMethod.PAYSLIP,
+                        BigDecimal.ZERO
+                );
+
+        for (IncidentEntity incident : pending) {
+            if (incident.getOperationalWeek() > eligibleThroughWeek || available.signum() <= 0) {
+                continue;
+            }
+            BigDecimal amount = incident.getRemainingAmount().min(available);
+            deductions.add(new PlannedIncidentDeduction(
+                    UUID.randomUUID(),
+                    incident,
+                    amount
+            ));
+            available = available.subtract(amount);
+            total = total.add(amount);
+        }
+        return new IncidentDeductionPlan(List.copyOf(deductions), total);
+    }
+
+    private void applyIncidentDeductions(
+            UUID payslipId,
+            IncidentDeductionPlan plan,
+            Instant now
+    ) {
+        if (plan.items().isEmpty()) {
+            return;
+        }
+        List<IncidentEntity> incidents = new ArrayList<>();
+        List<IncidentPayslipDeductionEntity> deductions = new ArrayList<>();
+
+        for (PlannedIncidentDeduction item : plan.items()) {
+            item.incident().applyPayslipDeduction(item.amount(), now);
+            incidents.add(item.incident());
+            deductions.add(new IncidentPayslipDeductionEntity(
+                    item.deductionId(),
+                    item.incident().getId(),
+                    payslipId,
+                    item.amount(),
+                    now
+            ));
+        }
+        incidentRepository.saveAllAndFlush(incidents);
+        incidentDeductionRepository.saveAllAndFlush(deductions);
     }
 
     private Result result(PayslipEntity payslip) {
@@ -296,15 +418,17 @@ public class PayslipService implements PayslipOperations {
 
     private List<PayslipLineEntity> saveLines(
             UUID payslipId,
-            List<PayrollCalculator.Line> calculatedLines
+            List<PayrollCalculator.Line> calculatedLines,
+            IncidentDeductionPlan incidentPlan
     ) {
         List<PayslipLineEntity> lines = new ArrayList<>();
-        for (int index = 0; index < calculatedLines.size(); index++) {
-            PayrollCalculator.Line line = calculatedLines.get(index);
+        int order = 1;
+
+        for (PayrollCalculator.Line line : calculatedLines) {
             lines.add(new PayslipLineEntity(
                     UUID.randomUUID(),
                     payslipId,
-                    index + 1,
+                    order++,
                     line.code(),
                     line.label(),
                     line.type(),
@@ -314,7 +438,34 @@ public class PayslipService implements PayslipOperations {
                     "{}"
             ));
         }
+
+        for (PlannedIncidentDeduction item : incidentPlan.items()) {
+            Map<String, Object> metadata = new LinkedHashMap<>();
+            metadata.put("incidentId", item.incident().getId().toString());
+            metadata.put("operationalWeek", item.incident().getOperationalWeek());
+            metadata.put("incidentType", item.incident().getType().name());
+            metadata.put("route", item.incident().getRouteLabel());
+            lines.add(new PayslipLineEntity(
+                    UUID.randomUUID(),
+                    payslipId,
+                    order++,
+                    "INCIDENT_DEDUCTION",
+                    incidentLineLabel(item.incident()),
+                    PayslipLineType.DEDUCTION,
+                    item.amount(),
+                    null,
+                    null,
+                    json(metadata)
+            ));
+        }
         return payslipLineRepository.saveAllAndFlush(lines);
+    }
+
+    private String incidentLineLabel(IncidentEntity incident) {
+        String label = "Incident deduction: " + incident.getDescription();
+        return label.length() <= 160
+                ? label
+                : label.substring(0, 157) + "...";
     }
 
     private PayrollCalculator.Context contextFrom(Map<String, Object> snapshot) {
@@ -333,24 +484,47 @@ public class PayslipService implements PayslipOperations {
             Map<String, Object> authoritativeContext,
             List<Integer> weeks,
             List<PayrollPeriodEntity> periods,
-            List<TripEntity> trips
+            List<TripEntity> trips,
+            IncidentDeductionPlan incidentPlan
     ) {
         Map<String, Object> snapshot = new LinkedHashMap<>(authoritativeContext);
         snapshot.put("policyVersion", POLICY_VERSION);
         snapshot.put("sourceOperationalWeeks", weeks);
         snapshot.put(
                 "sourcePayrollPeriodIds",
-                periods.stream().map(period -> period.getId().toString()).toList()
+                periods.stream()
+                        .map(period -> period.getId().toString())
+                        .toList()
         );
-        snapshot.put("sourceTripIds", trips.stream().map(trip -> trip.getId().toString()).toList());
-        snapshot.put("incidentDeductionsIncluded", false);
+        snapshot.put(
+                "sourceTripIds",
+                trips.stream()
+                        .map(trip -> trip.getId().toString())
+                        .toList()
+        );
+        snapshot.put(
+                "sourceIncidentIds",
+                incidentPlan.items().stream()
+                        .map(item -> item.incident().getId().toString())
+                        .toList()
+        );
+        snapshot.put(
+                "sourceIncidentDeductionIds",
+                incidentPlan.items().stream()
+                        .map(item -> item.deductionId().toString())
+                        .toList()
+        );
+        snapshot.put("incidentDeductionsIncluded", !incidentPlan.items().isEmpty());
         snapshot.put("emergencyReserveIncluded", false);
         return snapshot;
     }
 
     private Map<String, Object> snapshot(String json) {
         try {
-            return objectMapper.readValue(json.getBytes(StandardCharsets.UTF_8), SNAPSHOT_TYPE);
+            return objectMapper.readValue(
+                    json.getBytes(StandardCharsets.UTF_8),
+                    SNAPSHOT_TYPE
+            );
         } catch (JacksonException exception) {
             throw new IllegalStateException(
                     "Payroll period snapshot could not be deserialized",
@@ -363,20 +537,39 @@ public class PayslipService implements PayslipOperations {
         try {
             return objectMapper.writeValueAsString(value);
         } catch (JacksonException exception) {
-            throw new IllegalStateException("Payslip snapshot could not be serialized", exception);
+            throw new IllegalStateException(
+                    "Payslip snapshot could not be serialized",
+                    exception
+            );
         }
     }
 
-    private CareerEntity lockedOwnedCareer(UUID userId, CareerGame game, UUID careerId) {
-        return careerRepository.findForUpdateByIdAndUserIdAndGame(careerId, userId, game)
+    private CareerEntity lockedOwnedCareer(
+            UUID userId,
+            CareerGame game,
+            UUID careerId
+    ) {
+        return careerRepository.findForUpdateByIdAndUserIdAndGame(
+                        careerId,
+                        userId,
+                        game
+                )
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "CAREER_NOT_FOUND",
                         "The requested career does not exist"
                 ));
     }
 
-    private CareerEntity ownedCareer(UUID userId, CareerGame game, UUID careerId) {
-        return careerRepository.findByIdAndUserIdAndGame(careerId, userId, game)
+    private CareerEntity ownedCareer(
+            UUID userId,
+            CareerGame game,
+            UUID careerId
+    ) {
+        return careerRepository.findByIdAndUserIdAndGame(
+                        careerId,
+                        userId,
+                        game
+                )
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "CAREER_NOT_FOUND",
                         "The requested career does not exist"
@@ -395,18 +588,53 @@ public class PayslipService implements PayslipOperations {
                 : Integer.parseInt(String.valueOf(value));
     }
 
-    private BigDecimal decimal(Map<String, Object> map, String key, BigDecimal fallback) {
+    private BigDecimal decimal(
+            Map<String, Object> map,
+            String key,
+            BigDecimal fallback
+    ) {
         Object value = map.get(key);
         return value == null || String.valueOf(value).isBlank()
                 ? fallback
                 : new BigDecimal(String.valueOf(value));
     }
 
-    private ApiProblemException badRequest(String code, String title, String detail) {
-        return new ApiProblemException(HttpStatus.BAD_REQUEST, code, title, detail);
+    private ApiProblemException badRequest(
+            String code,
+            String title,
+            String detail
+    ) {
+        return new ApiProblemException(
+                HttpStatus.BAD_REQUEST,
+                code,
+                title,
+                detail
+        );
     }
 
-    private ApiProblemException conflict(String code, String title, String detail) {
-        return new ApiProblemException(HttpStatus.CONFLICT, code, title, detail);
+    private ApiProblemException conflict(
+            String code,
+            String title,
+            String detail
+    ) {
+        return new ApiProblemException(
+                HttpStatus.CONFLICT,
+                code,
+                title,
+                detail
+        );
+    }
+
+    private record PlannedIncidentDeduction(
+            UUID deductionId,
+            IncidentEntity incident,
+            BigDecimal amount
+    ) {
+    }
+
+    private record IncidentDeductionPlan(
+            List<PlannedIncidentDeduction> items,
+            BigDecimal total
+    ) {
     }
 }
