@@ -16,6 +16,9 @@ import com.luislipinski.trucklife.identity.persistence.UserEntity;
 import com.luislipinski.trucklife.identity.persistence.UserRepository;
 import com.luislipinski.trucklife.ledger.domain.LedgerEntryType;
 import com.luislipinski.trucklife.ledger.persistence.LedgerEntryRepository;
+import com.luislipinski.trucklife.payroll.persistence.PayrollPeriodRepository;
+import com.luislipinski.trucklife.payroll.persistence.PayslipLineRepository;
+import com.luislipinski.trucklife.payroll.persistence.PayslipRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -43,15 +46,133 @@ import org.testcontainers.utility.DockerImageName;
 class FinancingPayrollIntegrationTest {
     private static final String CAREERS="/api/v1/careers";
     @Container @ServiceConnection static final PostgreSQLContainer POSTGRES=new PostgreSQLContainer(DockerImageName.parse("postgres:18-alpine"));
-    @Autowired RestTestClient restTestClient;@Autowired UserRepository userRepository;@Autowired CareerRepository careerRepository;@Autowired FinancialContractRepository contractRepository;@Autowired FinancialInstallmentRepository installmentRepository;@Autowired FinancialPaymentRepository paymentRepository;@Autowired FinancialContractEventRepository eventRepository;@Autowired LedgerEntryRepository ledgerRepository;@Autowired JwtAccessTokenIssuer tokenIssuer;
+    @Autowired RestTestClient restTestClient;
+    @Autowired UserRepository userRepository;
+    @Autowired CareerRepository careerRepository;
+    @Autowired FinancialContractRepository contractRepository;
+    @Autowired FinancialInstallmentRepository installmentRepository;
+    @Autowired FinancialPaymentRepository paymentRepository;
+    @Autowired FinancialContractEventRepository eventRepository;
+    @Autowired LedgerEntryRepository ledgerRepository;
+    @Autowired PayslipLineRepository payslipLineRepository;
+    @Autowired PayslipRepository payslipRepository;
+    @Autowired PayrollPeriodRepository payrollPeriodRepository;
+    @Autowired JwtAccessTokenIssuer tokenIssuer;
 
-    @BeforeEach void clean(){ledgerRepository.deleteAllInBatch();eventRepository.deleteAllInBatch();paymentRepository.deleteAllInBatch();installmentRepository.deleteAllInBatch();contractRepository.deleteAllInBatch();careerRepository.deleteAllInBatch();userRepository.deleteAllInBatch();}
+    @BeforeEach void clean(){
+        ledgerRepository.deleteAllInBatch();
+        eventRepository.deleteAllInBatch();
+        paymentRepository.deleteAllInBatch();
+        installmentRepository.deleteAllInBatch();
+        contractRepository.deleteAllInBatch();
+        payslipLineRepository.deleteAllInBatch();
+        payslipRepository.deleteAllInBatch();
+        payrollPeriodRepository.deleteAllInBatch();
+        careerRepository.deleteAllInBatch();
+        userRepository.deleteAllInBatch();
+    }
 
-    @Test void atsPayslipAutomaticallyPaysDueWeeklyInstallmentInSameOperationalClose(){UserEntity owner=saveUser("financing-payroll@example.com");String token=tokenIssuer.issue(owner,UUID.randomUUID()).token();CareerResponse career=createCareer(token);Map<String,Object> contract=new LinkedHashMap<>();contract.put("operationId",UUID.randomUUID());contract.put("productType","PERSONAL_LOAN");contract.put("requestedAmount",new BigDecimal("500.00"));contract.put("termPeriods",52);contract.put("expectedOperationalWeek",1);contract.put("expectedBalance",new BigDecimal("5000.00"));FinancialContractResponse created=Objects.requireNonNull(restTestClient.post().uri(financingPath(career.id())).headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(contract).exchange().expectStatus().isCreated().expectBody(FinancialContractResponse.class).returnResult().getResponseBody());BigDecimal originalPrincipal=created.remainingPrincipal();
-        generatePayslip(token,career.id(),1);assertThat(paymentRepository.count()).isZero();generatePayslip(token,career.id(),2);assertThat(paymentRepository.findAllByContractIdOrderByRecordedAtAscIdAsc(created.id())).singleElement().satisfies(p->{assertThat(p.getPaymentType()).isEqualTo(FinancialPaymentType.AUTO);assertThat(p.getOperationalWeek()).isEqualTo(2);});assertThat(contractRepository.findById(created.id()).orElseThrow().getRemainingPrincipal()).isLessThan(originalPrincipal);assertThat(ledgerRepository.findAllByCareerIdOrderByRecordedAtDescEntryOrderDescIdDesc(career.id(),Pageable.unpaged())).anyMatch(e->e.getEntryType()==LedgerEntryType.DEBT_PAYMENT&&e.getOperationalWeek()==2);assertThat(careerRepository.findById(career.id()).orElseThrow().getCurrentOperationalWeek()).isEqualTo(3);}
+    @Test void atsPayslipAutomaticallyPaysDueWeeklyInstallmentInSameOperationalClose(){
+        UserEntity owner=saveUser("financing-payroll@example.com");
+        String token=tokenIssuer.issue(owner,UUID.randomUUID()).token();
+        CareerResponse career=createAtsCareer(token);
+        Map<String,Object> contract=new LinkedHashMap<>();
+        contract.put("operationId",UUID.randomUUID());
+        contract.put("productType","PERSONAL_LOAN");
+        contract.put("requestedAmount",new BigDecimal("500.00"));
+        contract.put("termPeriods",52);
+        contract.put("expectedOperationalWeek",1);
+        contract.put("expectedBalance",new BigDecimal("5000.00"));
+        FinancialContractResponse created=Objects.requireNonNull(restTestClient.post().uri(financingPath(career.id(),"ATS")).headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(contract).exchange().expectStatus().isCreated().expectBody(FinancialContractResponse.class).returnResult().getResponseBody());
+        BigDecimal originalPrincipal=created.remainingPrincipal();
 
-    private void generatePayslip(String token,UUID careerId,int week){restTestClient.post().uri(CAREERS+"/"+careerId+"/payslips?game=ATS").headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(Map.of("expectedOperationalWeek",week)).exchange().expectStatus().isCreated();}
-    private String financingPath(UUID careerId){return CAREERS+"/"+careerId+"/financing/contracts?game=ATS";}
-    private CareerResponse createCareer(String token){Map<String,Object> request=new LinkedHashMap<>();request.put("game","ATS");request.put("driverName","Payroll Finance Driver");request.put("companyName","Road Logistics");request.put("initialBalance",new BigDecimal("5000.00"));request.put("baseCurrency","USD");request.put("displayCurrency","USD");request.put("exchangeRate",new BigDecimal("1.00000000"));request.put("exchangeRateAsOf","2026-08-28");request.put("stateCode","AZ");request.put("countryCode","US");request.put("baseCity","Phoenix, AZ");request.put("cityMarketVersion","test-v1");request.put("cityMarketLabel","Test market");request.put("cityCostFactor",new BigDecimal("1.0000"));request.put("citySalaryFactor",new BigDecimal("1.0000"));return Objects.requireNonNull(restTestClient.post().uri(CAREERS).headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(request).exchange().expectStatus().isCreated().expectBody(CareerResponse.class).returnResult().getResponseBody());}
+        generateAtsPayslip(token,career.id(),1);
+        assertThat(paymentRepository.count()).isZero();
+        generateAtsPayslip(token,career.id(),2);
+
+        assertThat(paymentRepository.findAllByContractIdOrderByRecordedAtAscIdAsc(created.id())).singleElement().satisfies(p->{
+            assertThat(p.getPaymentType()).isEqualTo(FinancialPaymentType.AUTO);
+            assertThat(p.getOperationalWeek()).isEqualTo(2);
+            assertThat(p.getPayrollMonth()).isNull();
+        });
+        assertThat(contractRepository.findById(created.id()).orElseThrow().getRemainingPrincipal()).isLessThan(originalPrincipal);
+        assertThat(ledgerRepository.findAllByCareerIdOrderByRecordedAtDescEntryOrderDescIdDesc(career.id(),Pageable.unpaged())).anyMatch(e->e.getEntryType()==LedgerEntryType.DEBT_PAYMENT&&e.getOperationalWeek()==2);
+        assertThat(careerRepository.findById(career.id()).orElseThrow().getCurrentOperationalWeek()).isEqualTo(3);
+    }
+
+    @Test void ets2MonthlyPayslipAutomaticallyPaysInstallmentOnlyWhenItsOperationalMonthIsDue(){
+        UserEntity owner=saveUser("financing-payroll-ets2@example.com");
+        String token=tokenIssuer.issue(owner,UUID.randomUUID()).token();
+        CareerResponse career=createEts2Career(token);
+        Map<String,Object> contract=new LinkedHashMap<>();
+        contract.put("operationId",UUID.randomUUID());
+        contract.put("productType","PERSONAL_LOAN");
+        contract.put("requestedAmount",new BigDecimal("500.00"));
+        contract.put("termPeriods",12);
+        contract.put("expectedOperationalWeek",1);
+        contract.put("expectedPayrollMonth",1);
+        contract.put("expectedBalance",new BigDecimal("5000.00"));
+        FinancialContractResponse created=Objects.requireNonNull(restTestClient.post().uri(financingPath(career.id(),"ETS2")).headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(contract).exchange().expectStatus().isCreated().expectBody(FinancialContractResponse.class).returnResult().getResponseBody());
+        BigDecimal originalPrincipal=created.remainingPrincipal();
+        assertThat(created.installments().getFirst().duePayrollMonth()).isEqualTo(2);
+
+        closeEts2Week(token,career.id(),1);
+        closeEts2Week(token,career.id(),2);
+        closeEts2Week(token,career.id(),3);
+        closeEts2Week(token,career.id(),4);
+        generateEts2Payslip(token,career.id(),1);
+        assertThat(paymentRepository.count()).isZero();
+
+        closeEts2Week(token,career.id(),5);
+        closeEts2Week(token,career.id(),6);
+        closeEts2Week(token,career.id(),7);
+        closeEts2Week(token,career.id(),8);
+        generateEts2Payslip(token,career.id(),2);
+
+        assertThat(paymentRepository.findAllByContractIdOrderByRecordedAtAscIdAsc(created.id())).singleElement().satisfies(p->{
+            assertThat(p.getPaymentType()).isEqualTo(FinancialPaymentType.AUTO);
+            assertThat(p.getOperationalWeek()).isEqualTo(8);
+            assertThat(p.getPayrollMonth()).isEqualTo(2);
+        });
+        assertThat(contractRepository.findById(created.id()).orElseThrow().getRemainingPrincipal()).isLessThan(originalPrincipal);
+        assertThat(ledgerRepository.findAllByCareerIdOrderByRecordedAtDescEntryOrderDescIdDesc(career.id(),Pageable.unpaged())).anyMatch(e->e.getEntryType()==LedgerEntryType.DEBT_PAYMENT&&Integer.valueOf(2).equals(e.getPayrollMonth()));
+        assertThat(careerRepository.findById(career.id()).orElseThrow().getCurrentPayrollMonth()).isEqualTo(3);
+    }
+
+    private void generateAtsPayslip(String token,UUID careerId,int week){restTestClient.post().uri(CAREERS+"/"+careerId+"/payslips?game=ATS").headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(Map.of("expectedOperationalWeek",week)).exchange().expectStatus().isCreated();}
+    private void generateEts2Payslip(String token,UUID careerId,int month){restTestClient.post().uri(CAREERS+"/"+careerId+"/payslips?game=ETS2").headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(Map.of("expectedPayrollMonth",month)).exchange().expectStatus().isCreated();}
+    private void closeEts2Week(String token,UUID careerId,int week){restTestClient.post().uri(CAREERS+"/"+careerId+"/payroll-periods/close?game=ETS2").headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(Map.of("expectedOperationalWeek",week)).exchange().expectStatus().isCreated();}
+    private String financingPath(UUID careerId,String game){return CAREERS+"/"+careerId+"/financing/contracts?game="+game;}
+
+    private CareerResponse createAtsCareer(String token){
+        Map<String,Object> request=baseCareerRequest("ATS","Payroll Finance Driver","USD","US","Phoenix, AZ");
+        request.put("stateCode","AZ");
+        return createCareer(token,request);
+    }
+
+    private CareerResponse createEts2Career(String token){
+        return createCareer(token,baseCareerRequest("ETS2","Payroll Finance ETS2 Driver","EUR","DE","Berlin"));
+    }
+
+    private Map<String,Object> baseCareerRequest(String game,String driverName,String currency,String country,String city){
+        Map<String,Object> request=new LinkedHashMap<>();
+        request.put("game",game);
+        request.put("driverName",driverName);
+        request.put("companyName","Road Logistics");
+        request.put("initialBalance",new BigDecimal("5000.00"));
+        request.put("baseCurrency",currency);
+        request.put("displayCurrency",currency);
+        request.put("exchangeRate",new BigDecimal("1.00000000"));
+        request.put("exchangeRateAsOf","2026-08-28");
+        request.put("countryCode",country);
+        request.put("baseCity",city);
+        request.put("cityMarketVersion","test-v1");
+        request.put("cityMarketLabel","Test market");
+        request.put("cityCostFactor",new BigDecimal("1.0000"));
+        request.put("citySalaryFactor",new BigDecimal("1.0000"));
+        return request;
+    }
+
+    private CareerResponse createCareer(String token,Map<String,Object> request){return Objects.requireNonNull(restTestClient.post().uri(CAREERS).headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(request).exchange().expectStatus().isCreated().expectBody(CareerResponse.class).returnResult().getResponseBody());}
     private UserEntity saveUser(String email){Instant now=Instant.now().minus(1,ChronoUnit.MINUTES);return userRepository.saveAndFlush(new UserEntity(UUID.randomUUID(),email,email.toLowerCase(),"encoded-password-not-used",email,UserStatus.ACTIVE,UserRole.USER,true,now,now,now,null));}
 }
