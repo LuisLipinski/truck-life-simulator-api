@@ -20,15 +20,37 @@ class FinancingPolicyCatalogTest {
         CareerEntity career=career(CareerGame.ATS,"USD","US","AZ","Phoenix, AZ");
         var personal=catalog.offers(career,FinancialProductType.PERSONAL_LOAN,new BigDecimal("10000.00"));
         var vehicle=catalog.offers(career,FinancialProductType.VEHICLE_FINANCING,new BigDecimal("100000.00"));
-        assertThat(personal).hasSize(2);assertThat(personal.getFirst().annualInterestRate()).isEqualByComparingTo("0.1186000000");assertThat(personal.getFirst().paymentFrequency()).isEqualTo(FinancialPaymentFrequency.WEEKLY);assertThat(personal.getFirst().downPayment()).isEqualByComparingTo("0.00");
-        assertThat(vehicle).hasSize(3);assertThat(vehicle.getFirst().annualInterestRate()).isEqualByComparingTo("0.0714000000");assertThat(vehicle.getFirst().principal()).isEqualByComparingTo("80000.00");assertThat(vehicle.getFirst().downPayment()).isEqualByComparingTo("20000.00");
-        FinancingPolicyCatalog.Plan plan=catalog.plan(new BigDecimal("10000.00"),new BigDecimal("0.1186000000"),FinancialPaymentFrequency.WEEKLY,52);assertThat(plan.periods()).hasSize(52);assertThat(plan.periods().stream().map(FinancingPolicyCatalog.PeriodAmount::principal).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo("10000.00");
+        assertThat(personal).hasSize(2);
+        assertThat(personal.getFirst().annualInterestRate()).isEqualByComparingTo("0.1186000000");
+        assertThat(personal.getFirst().paymentFrequency()).isEqualTo(FinancialPaymentFrequency.WEEKLY);
+        assertThat(personal.getFirst().downPayment()).isEqualByComparingTo("0.00");
+        assertThat(personal.getFirst().policySource()).isEqualTo("https://fred.stlouisfed.org/series/TERMCBPER24NS");
+        assertThat(personal.getFirst().rateBasis()).isEqualTo("FED_G19_24_MONTH_PERSONAL_LOAN_RATE");
+        assertThat(personal.getFirst().policyReferenceAsOf()).isEqualTo(LocalDate.of(2026,5,1));
+        assertThat(vehicle).hasSize(3);
+        assertThat(vehicle.getFirst().annualInterestRate()).isEqualByComparingTo("0.0714000000");
+        assertThat(vehicle.getFirst().principal()).isEqualByComparingTo("80000.00");
+        assertThat(vehicle.getFirst().downPayment()).isEqualByComparingTo("20000.00");
+        assertThat(vehicle.getFirst().policySource()).isEqualTo("https://fred.stlouisfed.org/series/RIFLPBCIANM60NM");
+        FinancingPolicyCatalog.Plan plan=catalog.plan(new BigDecimal("10000.00"),new BigDecimal("0.1186000000"),FinancialPaymentFrequency.WEEKLY,52);
+        assertThat(plan.periods()).hasSize(52);
+        assertThat(plan.periods().stream().map(FinancingPolicyCatalog.PeriodAmount::principal).reduce(BigDecimal.ZERO,BigDecimal::add)).isEqualByComparingTo("10000.00");
     }
 
     @Test void usesCountrySpecificEcbReferencesAndRefusesUnresearchedJurisdictions(){
-        CareerEntity germany=career(CareerGame.ETS2,"EUR","DE",null,"Berlin");var offer=catalog.offers(germany,FinancialProductType.PERSONAL_LOAN,new BigDecimal("5000.00")).getFirst();assertThat(offer.annualInterestRate()).isEqualByComparingTo("0.0812000000");assertThat(offer.paymentFrequency()).isEqualTo(FinancialPaymentFrequency.MONTHLY);assertThat(offer.policySource()).contains("ecb.europa.eu");
-        CareerEntity uk=career(CareerGame.ETS2,"GBP","GB",null,"London");assertThat(catalog.offers(uk,FinancialProductType.VEHICLE_FINANCING,new BigDecimal("25000.00")).getFirst().annualInterestRate()).isEqualByComparingTo("0.0535000000");
-        CareerEntity poland=career(CareerGame.ETS2,"PLN","PL",null,"Warsaw");assertThatThrownBy(()->catalog.offers(poland,FinancialProductType.PERSONAL_LOAN,new BigDecimal("5000.00"))).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("refuses to invent");
+        CareerEntity germany=career(CareerGame.ETS2,"EUR","DE",null,"Berlin");
+        var offer=catalog.offers(germany,FinancialProductType.PERSONAL_LOAN,new BigDecimal("5000.00")).getFirst();
+        assertThat(offer.annualInterestRate()).isEqualByComparingTo("0.0812000000");
+        assertThat(offer.paymentFrequency()).isEqualTo(FinancialPaymentFrequency.MONTHLY);
+        assertThat(offer.policySource()).contains("ecb.europa.eu");
+        CareerEntity uk=career(CareerGame.ETS2,"GBP","GB",null,"London");
+        var ukOffer=catalog.offers(uk,FinancialProductType.VEHICLE_FINANCING,new BigDecimal("25000.00")).getFirst();
+        assertThat(ukOffer.annualInterestRate()).isEqualByComparingTo("0.0535000000");
+        assertThat(ukOffer.policySource()).isEqualTo("https://www.bankofengland.co.uk/statistics/effective-interest-rates/2026/may-2026");
+        assertThat(ukOffer.rateBasis()).isEqualTo("BOE_PNFC_NEW_BUSINESS_LOAN_REFERENCE");
+        assertThat(ukOffer.policyReferenceAsOf()).isEqualTo(LocalDate.of(2026,5,1));
+        CareerEntity poland=career(CareerGame.ETS2,"PLN","PL",null,"Warsaw");
+        assertThatThrownBy(()->catalog.offers(poland,FinancialProductType.PERSONAL_LOAN,new BigDecimal("5000.00"))).isInstanceOf(IllegalArgumentException.class).hasMessageContaining("refuses to invent");
     }
 
     @Test void rejectsArbitraryTermsAndSubCurrencyAmounts(){CareerEntity career=career(CareerGame.ATS,"USD","US","CA","Los Angeles, CA");assertThatThrownBy(()->catalog.offer(career,FinancialProductType.PERSONAL_LOAN,new BigDecimal("1000.00"),12)).isInstanceOf(IllegalArgumentException.class);assertThatThrownBy(()->catalog.offers(career,FinancialProductType.PERSONAL_LOAN,new BigDecimal("0.50"))).isInstanceOf(IllegalArgumentException.class);}
