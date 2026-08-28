@@ -91,7 +91,7 @@ public class FinancialContractEntity {
 
     public void applyPrincipalPayment(BigDecimal amount,Instant now){
         if(amount==null||amount.signum()<0||amount.compareTo(remainingPrincipal)>0)throw new IllegalArgumentException("Principal payment is invalid");
-        remainingPrincipal=remainingPrincipal.subtract(amount);updatedAt=now;if(remainingPrincipal.signum()==0)status=FinancialContractStatus.PAID_OFF;
+        remainingPrincipal=remainingPrincipal.subtract(amount);updatedAt=now;
     }
     public int advanceScheduleVersion(Instant now){currentScheduleVersion+=1;updatedAt=now;return currentScheduleVersion;}
     public void markActive(Instant now){if(status!=FinancialContractStatus.PAID_OFF&&status!=FinancialContractStatus.DEFAULTED){status=FinancialContractStatus.ACTIVE;updatedAt=now;}}
