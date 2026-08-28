@@ -1,0 +1,15 @@
+package com.luislipinski.trucklife.ledger.domain;
+
+public enum LedgerEntryType {
+    OPENING_BALANCE,
+    PAYSLIP_CREDIT,
+    MONTHLY_EXPENSE,
+    INCIDENT_CHARGE,
+    ACADEMY_FEE,
+    QUALIFICATION_FEE,
+    RESERVE_DEPOSIT,
+    RESERVE_WITHDRAWAL,
+    RESERVE_AUTO_CONTRIBUTION,
+    RESERVE_INTEREST,
+    BALANCE_ADJUSTMENT
+}
