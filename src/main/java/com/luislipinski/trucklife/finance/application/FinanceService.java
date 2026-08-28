@@ -1,0 +1,159 @@
+package com.luislipinski.trucklife.finance.application;
+
+import com.luislipinski.trucklife.career.domain.CareerGame;
+import com.luislipinski.trucklife.career.persistence.CareerEntity;
+import com.luislipinski.trucklife.career.persistence.CareerRepository;
+import com.luislipinski.trucklife.finance.domain.EmergencyReserveEventType;
+import com.luislipinski.trucklife.finance.domain.ExpenseType;
+import com.luislipinski.trucklife.finance.domain.MonthlyExpenseCategory;
+import com.luislipinski.trucklife.finance.persistence.EmergencyReserveEntity;
+import com.luislipinski.trucklife.finance.persistence.EmergencyReserveEventEntity;
+import com.luislipinski.trucklife.finance.persistence.EmergencyReserveEventRepository;
+import com.luislipinski.trucklife.finance.persistence.EmergencyReserveRepository;
+import com.luislipinski.trucklife.finance.persistence.MonthlyExpenseApplicationEntity;
+import com.luislipinski.trucklife.finance.persistence.MonthlyExpenseApplicationRepository;
+import com.luislipinski.trucklife.finance.persistence.MonthlyExpenseEntity;
+import com.luislipinski.trucklife.finance.persistence.MonthlyExpenseRepository;
+import com.luislipinski.trucklife.shared.error.ApiProblemException;
+import com.luislipinski.trucklife.shared.error.ResourceNotFoundException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import tools.jackson.core.JacksonException;
+import tools.jackson.databind.ObjectMapper;
+
+@Service
+public class FinanceService implements FinanceOperations, FinancePayrollOperations {
+    private final CareerRepository careerRepository;
+    private final MonthlyExpenseRepository expenseRepository;
+    private final MonthlyExpenseApplicationRepository applicationRepository;
+    private final EmergencyReserveRepository reserveRepository;
+    private final EmergencyReserveEventRepository reserveEventRepository;
+    private final ObjectMapper objectMapper;
+    private final Clock clock;
+
+    public FinanceService(CareerRepository careerRepository, MonthlyExpenseRepository expenseRepository,
+                          MonthlyExpenseApplicationRepository applicationRepository, EmergencyReserveRepository reserveRepository,
+                          EmergencyReserveEventRepository reserveEventRepository, ObjectMapper objectMapper, Clock clock) {
+        this.careerRepository=careerRepository; this.expenseRepository=expenseRepository; this.applicationRepository=applicationRepository;
+        this.reserveRepository=reserveRepository; this.reserveEventRepository=reserveEventRepository; this.objectMapper=objectMapper; this.clock=clock;
+    }
+
+    @Override @Transactional
+    public State get(UUID userId, CareerGame game, UUID careerId) {
+        CareerEntity career=lockedCareer(userId,game,careerId); ensureInitialized(career,clock.instant()); return state(career);
+    }
+
+    @Override @Transactional
+    public State createCustomExpense(UUID userId,CareerGame game,UUID careerId,Integer expectedWeek,Integer expectedMonth,String name,BigDecimal amount,boolean included){
+        CareerEntity career=lockedCareer(userId,game,careerId); validateContext(career,expectedWeek,expectedMonth); Instant now=clock.instant(); ensureInitialized(career,now);
+        MonthlyExpenseEntity expense=new MonthlyExpenseEntity(UUID.randomUUID(),careerId,ExpenseType.CUSTOM,null,requiredName(name),money(amount),included,career.getDisplayCurrency(),FinancePolicyCatalog.VERSION,json(expenseContext(career)),now,now);
+        expenseRepository.saveAndFlush(expense); return state(career);
+    }
+
+    @Override @Transactional
+    public State updateExpense(UUID userId,CareerGame game,UUID careerId,UUID expenseId,Integer expectedWeek,Integer expectedMonth,String name,BigDecimal amount,boolean included){
+        CareerEntity career=lockedCareer(userId,game,careerId); validateContext(career,expectedWeek,expectedMonth); Instant now=clock.instant(); ensureInitialized(career,now);
+        MonthlyExpenseEntity expense=expenseRepository.findByIdAndCareerId(expenseId,careerId).orElseThrow(() -> notFound("MONTHLY_EXPENSE_NOT_FOUND","Monthly expense not found"));
+        expense.update(money(amount),included,expense.isCustom()?requiredName(name):null,now); expenseRepository.flush(); return state(career);
+    }
+
+    @Override @Transactional
+    public State deleteExpense(UUID userId,CareerGame game,UUID careerId,UUID expenseId,Integer expectedWeek,Integer expectedMonth){
+        CareerEntity career=lockedCareer(userId,game,careerId); validateContext(career,expectedWeek,expectedMonth); ensureInitialized(career,clock.instant());
+        MonthlyExpenseEntity expense=expenseRepository.findByIdAndCareerId(expenseId,careerId).orElseThrow(() -> notFound("MONTHLY_EXPENSE_NOT_FOUND","Monthly expense not found"));
+        if(!expense.isCustom()) throw conflict("MONTHLY_EXPENSE_STANDARD_DELETE_FORBIDDEN","Standard expense cannot be deleted","Standard expenses can be edited or excluded, but not deleted");
+        expenseRepository.delete(expense); expenseRepository.flush(); return state(career);
+    }
+
+    @Override @Transactional
+    public State applyExpenses(UUID userId,CareerGame game,UUID careerId,UUID operationId,Integer expectedWeek,Integer expectedMonth){
+        CareerEntity career=lockedCareer(userId,game,careerId); validateContext(career,expectedWeek,expectedMonth); Instant now=clock.instant(); ensureInitialized(career,now);
+        MonthlyExpenseApplicationEntity existing=applicationRepository.findById(operationId).orElse(null);
+        if(existing!=null){if(!existing.getCareerId().equals(careerId)) throw operationConflict(); return state(career);}
+        List<MonthlyExpenseEntity> expenses=expenseRepository.findAllByCareerIdOrderByCreatedAtAscIdAsc(careerId);
+        BigDecimal total=expenses.stream().filter(MonthlyExpenseEntity::isIncluded).map(MonthlyExpenseEntity::getAmount).reduce(BigDecimal.ZERO,BigDecimal::add).setScale(2,RoundingMode.HALF_UP);
+        if(career.getBalance().compareTo(total)<0) throw conflict("MONTHLY_EXPENSE_BALANCE_INSUFFICIENT","Insufficient balance","Career balance is insufficient to apply the selected monthly expenses");
+        career.debitBalance(total,now);
+        applicationRepository.saveAndFlush(new MonthlyExpenseApplicationEntity(operationId,careerId,career.getCurrentOperationalWeek(),career.getGame()==CareerGame.ETS2?career.getCurrentPayrollMonth():null,total,career.getDisplayCurrency(),json(applicationSnapshot(career,expenses,total)),now));
+        careerRepository.flush(); return state(career);
+    }
+
+    @Override @Transactional
+    public State depositReserve(UUID userId,CareerGame game,UUID careerId,UUID operationId,Integer expectedWeek,Integer expectedMonth,BigDecimal amount){
+        CareerEntity career=lockedCareer(userId,game,careerId); validateContext(career,expectedWeek,expectedMonth); Instant now=clock.instant(); EmergencyReserveEntity reserve=ensureInitialized(career,now);
+        if(idempotentEvent(operationId,careerId)) return state(career); BigDecimal value=positiveMoney(amount);
+        if(career.getBalance().compareTo(value)<0) throw conflict("RESERVE_BALANCE_INSUFFICIENT","Insufficient balance","Career balance is insufficient for this reserve deposit");
+        BigDecimal before=reserve.getBalance(); career.debitBalance(value,now); reserve.deposit(value,now);
+        reserveEventRepository.saveAndFlush(event(operationId,career,null,EmergencyReserveEventType.MANUAL_DEPOSIT,value,before,reserve.getBalance(),null,now)); careerRepository.flush(); reserveRepository.flush(); return state(career);
+    }
+
+    @Override @Transactional
+    public State withdrawReserve(UUID userId,CareerGame game,UUID careerId,UUID operationId,Integer expectedWeek,Integer expectedMonth,BigDecimal amount,String reason){
+        CareerEntity career=lockedCareer(userId,game,careerId); validateContext(career,expectedWeek,expectedMonth); Instant now=clock.instant(); EmergencyReserveEntity reserve=ensureInitialized(career,now);
+        if(idempotentEvent(operationId,careerId)) return state(career); BigDecimal value=positiveMoney(amount); String normalizedReason=requiredReason(reason);
+        if(reserve.getBalance().compareTo(value)<0) throw conflict("RESERVE_FUNDS_INSUFFICIENT","Insufficient reserve","Emergency reserve balance is insufficient for this withdrawal");
+        BigDecimal before=reserve.getBalance(); reserve.withdraw(value,now); career.creditBalance(value,now);
+        reserveEventRepository.saveAndFlush(event(operationId,career,null,EmergencyReserveEventType.MANUAL_WITHDRAWAL,value,before,reserve.getBalance(),normalizedReason,now)); careerRepository.flush(); reserveRepository.flush(); return state(career);
+    }
+
+    @Override @Transactional
+    public State configureAutoReserve(UUID userId,CareerGame game,UUID careerId,Integer expectedWeek,Integer expectedMonth,boolean enabled,BigDecimal amount){
+        CareerEntity career=lockedCareer(userId,game,careerId); validateContext(career,expectedWeek,expectedMonth); Instant now=clock.instant(); EmergencyReserveEntity reserve=ensureInitialized(career,now);
+        BigDecimal value=enabled?positiveMoney(amount):BigDecimal.ZERO.setScale(2); reserve.configure(enabled,value,now); reserveRepository.flush(); return state(career);
+    }
+
+    @Override
+    public PayrollReserveResult applyPayslipReserve(CareerEntity career,BigDecimal availableDeposit,UUID payslipId,Instant now){
+        EmergencyReserveEntity reserve=ensureReserve(career,now); BigDecimal before=reserve.getBalance();
+        int periods=career.getGame()==CareerGame.ATS?52:12;
+        BigDecimal interest=money(before.multiply(reserve.getAnnualYieldRate()).divide(BigDecimal.valueOf(periods),12,RoundingMode.HALF_UP));
+        BigDecimal contribution=reserve.isAutoContributionEnabled()?reserve.getAutoContributionAmount():BigDecimal.ZERO.setScale(2);
+        if(contribution.compareTo(availableDeposit)>0) throw conflict("RESERVE_CONTRIBUTION_EXCEEDS_PAYSLIP","Reserve contribution exceeds payslip","Configured automatic reserve contribution exceeds the available payslip deposit after deductions");
+        if(interest.signum()>0){BigDecimal eventBefore=reserve.getBalance(); reserve.deposit(interest,now); reserveEventRepository.save(event(UUID.randomUUID(),career,payslipId,EmergencyReserveEventType.INTEREST,interest,eventBefore,reserve.getBalance(),null,now));}
+        if(contribution.signum()>0){BigDecimal eventBefore=reserve.getBalance(); reserve.deposit(contribution,now); reserveEventRepository.save(event(UUID.randomUUID(),career,payslipId,EmergencyReserveEventType.AUTO_CONTRIBUTION,contribution,eventBefore,reserve.getBalance(),null,now));}
+        reserveRepository.save(reserve);
+        return new PayrollReserveResult(interest,contribution,money(availableDeposit.subtract(contribution)),before,reserve.getBalance());
+    }
+
+    private EmergencyReserveEntity ensureInitialized(CareerEntity career,Instant now){ensureExpenses(career,now); return ensureReserve(career,now);}
+    private void ensureExpenses(CareerEntity career,Instant now){
+        List<MonthlyExpenseEntity> existing=expenseRepository.findAllByCareerIdOrderByCreatedAtAscIdAsc(career.getId()); Map<MonthlyExpenseCategory,MonthlyExpenseEntity> standards=new LinkedHashMap<>();
+        existing.stream().filter(e -> e.getCategory()!=null).forEach(e -> standards.put(e.getCategory(),e));
+        Map<MonthlyExpenseCategory,BigDecimal> defaults;
+        try{defaults=FinancePolicyCatalog.defaults(career);}catch(IllegalArgumentException ex){throw conflict("FINANCE_POLICY_UNAVAILABLE","Finance policy unavailable",ex.getMessage());}
+        List<MonthlyExpenseEntity> created=new ArrayList<>();
+        for(MonthlyExpenseCategory category:MonthlyExpenseCategory.values()) if(!standards.containsKey(category)) created.add(new MonthlyExpenseEntity(UUID.randomUUID(),career.getId(),ExpenseType.STANDARD,category,category.label(),defaults.get(category),true,career.getDisplayCurrency(),FinancePolicyCatalog.VERSION,json(expenseContext(career)),now,now));
+        if(!created.isEmpty()) expenseRepository.saveAllAndFlush(created);
+    }
+    private EmergencyReserveEntity ensureReserve(CareerEntity career,Instant now){
+        return reserveRepository.findById(career.getId()).orElseGet(() -> reserveRepository.saveAndFlush(new EmergencyReserveEntity(career.getId(),BigDecimal.ZERO.setScale(2),FinancePolicyCatalog.EMERGENCY_RESERVE_ANNUAL_YIELD,false,BigDecimal.ZERO.setScale(2),career.getDisplayCurrency(),FinancePolicyCatalog.VERSION,now)));
+    }
+    private State state(CareerEntity career){return new State(career,expenseRepository.findAllByCareerIdOrderByCreatedAtAscIdAsc(career.getId()),reserveRepository.findById(career.getId()).orElseThrow());}
+    private CareerEntity lockedCareer(UUID userId,CareerGame game,UUID careerId){return careerRepository.findForUpdateByIdAndUserIdAndGame(careerId,userId,game).orElseThrow(() -> new ResourceNotFoundException("CAREER_NOT_FOUND","The requested career does not exist"));}
+    private void validateContext(CareerEntity career,Integer expectedWeek,Integer expectedMonth){
+        if(expectedWeek==null || expectedWeek!=career.getCurrentOperationalWeek()) throw conflict("FINANCE_WEEK_CONFLICT","Operational week changed","The requested operational week is no longer current");
+        if(career.getGame()==CareerGame.ETS2 && (expectedMonth==null || !expectedMonth.equals(career.getCurrentPayrollMonth()))) throw conflict("FINANCE_MONTH_CONFLICT","Payroll month changed","The requested payroll month is no longer current");
+    }
+    private boolean idempotentEvent(UUID id,UUID careerId){EmergencyReserveEventEntity existing=reserveEventRepository.findById(id).orElse(null); if(existing==null)return false; if(!existing.getCareerId().equals(careerId))throw operationConflict(); return true;}
+    private EmergencyReserveEventEntity event(UUID id,CareerEntity career,UUID payslipId,EmergencyReserveEventType type,BigDecimal amount,BigDecimal before,BigDecimal after,String reason,Instant now){return new EmergencyReserveEventEntity(id,career.getId(),payslipId,type,amount,before,after,career.getDisplayCurrency(),career.getCurrentOperationalWeek(),career.getGame()==CareerGame.ETS2?career.getCurrentPayrollMonth():null,reason,now);}
+    private Map<String,Object> expenseContext(CareerEntity career){Map<String,Object> map=new LinkedHashMap<>(); map.put("policyVersion",FinancePolicyCatalog.VERSION); map.put("game",career.getGame().name()); map.put("stateCode",career.getStateCode()); map.put("countryCode",career.getCountryCode()); map.put("baseCity",career.getBaseCity()); map.put("cityCostFactor",career.getCityCostFactor()); map.put("baseCurrency",career.getBaseCurrency()); map.put("displayCurrency",career.getDisplayCurrency()); map.put("exchangeRate",career.getExchangeRate()); map.put("operationalWeek",career.getCurrentOperationalWeek()); map.put("payrollMonth",career.getCurrentPayrollMonth()); return map;}
+    private Map<String,Object> applicationSnapshot(CareerEntity career,List<MonthlyExpenseEntity> expenses,BigDecimal total){Map<String,Object> map=expenseContext(career); map.put("total",total); map.put("expenses",expenses.stream().filter(MonthlyExpenseEntity::isIncluded).map(e -> Map.of("id",e.getId().toString(),"name",e.getName(),"amount",e.getAmount(),"type",e.getExpenseType().name())).toList()); return map;}
+    private String json(Map<String,Object> value){try{return objectMapper.writeValueAsString(value);}catch(JacksonException ex){throw new IllegalStateException("Finance snapshot could not be serialized",ex);}}
+    private BigDecimal money(BigDecimal value){if(value==null || value.signum()<0)throw new ApiProblemException(HttpStatus.BAD_REQUEST,"FINANCE_AMOUNT_INVALID","Invalid amount","Amount must be zero or greater"); return FinancePolicyCatalog.money(value);}
+    private BigDecimal positiveMoney(BigDecimal value){BigDecimal result=money(value); if(result.signum()<=0)throw new ApiProblemException(HttpStatus.BAD_REQUEST,"FINANCE_AMOUNT_INVALID","Invalid amount","Amount must be greater than zero"); return result;}
+    private String requiredName(String name){if(name==null || name.isBlank())throw new ApiProblemException(HttpStatus.BAD_REQUEST,"FINANCE_NAME_REQUIRED","Expense name required","Custom expense name cannot be blank"); String value=name.strip(); if(value.length()>120)throw new ApiProblemException(HttpStatus.BAD_REQUEST,"FINANCE_NAME_INVALID","Expense name invalid","Custom expense name must have at most 120 characters"); return value;}
+    private String requiredReason(String reason){if(reason==null || reason.isBlank())throw new ApiProblemException(HttpStatus.BAD_REQUEST,"RESERVE_REASON_REQUIRED","Withdrawal reason required","Emergency reserve withdrawal requires a reason"); String value=reason.strip(); if(value.length()>240)throw new ApiProblemException(HttpStatus.BAD_REQUEST,"RESERVE_REASON_INVALID","Withdrawal reason invalid","Reason must have at most 240 characters"); return value;}
+    private ResourceNotFoundException notFound(String code,String detail){return new ResourceNotFoundException(code,detail);}
+    private ApiProblemException operationConflict(){return conflict("FINANCE_OPERATION_ID_CONFLICT","Operation identifier conflict","The supplied operationId already belongs to another career");}
+    private ApiProblemException conflict(String code,String title,String detail){return new ApiProblemException(HttpStatus.CONFLICT,code,title,detail);}
+}
