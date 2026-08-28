@@ -28,7 +28,7 @@ public class FinancingPolicyCatalog {
             Map.entry("LV",new BigDecimal("0.1179000000")),Map.entry("PT",new BigDecimal("0.0898000000")),
             Map.entry("SI",new BigDecimal("0.0574000000")),Map.entry("SK",new BigDecimal("0.0892000000")));
     private static final BigDecimal ECB_EURO_AREA_RATE=new BigDecimal("0.0759000000");
-    private static final BigDecimal BOE_HOUSEHOLD_LOAN_RATE=new BigDecimal("0.0535000000");
+    private static final BigDecimal BOE_PNFC_NEW_BUSINESS_LOAN_RATE=new BigDecimal("0.0535000000");
     private static final BigDecimal FED_AUTO_60M_RATE=new BigDecimal("0.0714000000");
     private static final BigDecimal FED_PERSONAL_24M_RATE=new BigDecimal("0.1186000000");
 
@@ -76,11 +76,11 @@ public class FinancingPolicyCatalog {
     private Policy policy(CareerEntity career,FinancialProductType productType){
         if(career.getGame()==CareerGame.ATS){BigDecimal rate=productType==FinancialProductType.VEHICLE_FINANCING?FED_AUTO_60M_RATE:FED_PERSONAL_24M_RATE;
             String basis=productType==FinancialProductType.VEHICLE_FINANCING?"FED_G19_60_MONTH_NEW_AUTO_FINANCE_RATE":"FED_G19_24_MONTH_PERSONAL_LOAN_RATE";
-            String source=productType==FinancialProductType.VEHICLE_FINANCING?"https://fred.stlouisfed.org/series/RIFLPBCIANM60NM":"https://fred.stlouisfed.org/series/RIFLPBCIANM24NM";
+            String source=productType==FinancialProductType.VEHICLE_FINANCING?"https://fred.stlouisfed.org/series/RIFLPBCIANM60NM":"https://fred.stlouisfed.org/series/TERMCBPER24NS";
             return new Policy("phase1-financing-us-fed-g19-2026-05-v1",source,LocalDate.of(2026,5,1),basis,rate);
         }
-        String country=normalize(career.getCountryCode());if("GB".equals(country))return new Policy("phase1-financing-gb-boe-2026-05-v1",
-                "https://www.bankofengland.co.uk/statistics/details/further-details-about-effective-interest-rates-data",LocalDate.of(2026,5,1),"BOE_NEW_BUSINESS_HOUSEHOLD_LOAN_REFERENCE",BOE_HOUSEHOLD_LOAN_RATE);
+        String country=normalize(career.getCountryCode());if("GB".equals(country))return new Policy("phase1-financing-gb-boe-pnfc-2026-05-v1",
+                "https://www.bankofengland.co.uk/statistics/effective-interest-rates/2026/may-2026",LocalDate.of(2026,5,1),"BOE_PNFC_NEW_BUSINESS_LOAN_REFERENCE",BOE_PNFC_NEW_BUSINESS_LOAN_RATE);
         if(EURO_AREA.contains(country)){BigDecimal rate=ECB_COUNTRY_RATES.getOrDefault(country,ECB_EURO_AREA_RATE);String suffix=ECB_COUNTRY_RATES.containsKey(country)?country:"EA";
             return new Policy("phase1-financing-ecb-consumer-credit-2026-04-v1-"+suffix,"https://data.ecb.europa.eu/data/datasets/MIR",LocalDate.of(2026,4,1),"ECB_MFI_NEW_CONSUMER_CREDIT_REFERENCE",rate);}
         throw new IllegalArgumentException("No researched financing reference policy is available yet for country "+country+"; the backend refuses to invent a rate");
