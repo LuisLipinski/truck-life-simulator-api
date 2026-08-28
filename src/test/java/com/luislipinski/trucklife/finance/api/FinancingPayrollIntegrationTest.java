@@ -4,6 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.luislipinski.trucklife.career.api.CareerResponse;
 import com.luislipinski.trucklife.career.persistence.CareerRepository;
+import com.luislipinski.trucklife.finance.domain.FinancialContractEventType;
+import com.luislipinski.trucklife.finance.domain.FinancialContractStatus;
 import com.luislipinski.trucklife.finance.domain.FinancialPaymentType;
 import com.luislipinski.trucklife.finance.persistence.FinancialContractEventRepository;
 import com.luislipinski.trucklife.finance.persistence.FinancialContractRepository;
@@ -139,9 +141,39 @@ class FinancingPayrollIntegrationTest {
         assertThat(careerRepository.findById(career.id()).orElseThrow().getCurrentPayrollMonth()).isEqualTo(3);
     }
 
+    @Test void atsUncoveredInstallmentsBecomeDelinquentAndThenDefaultAfterThreeMissedPeriods(){
+        UserEntity owner=saveUser("financing-default@example.com");
+        String token=tokenIssuer.issue(owner,UUID.randomUUID()).token();
+        CareerResponse career=createAtsCareer(token);
+        Map<String,Object> contract=new LinkedHashMap<>();
+        contract.put("operationId",UUID.randomUUID());
+        contract.put("productType","PERSONAL_LOAN");
+        contract.put("requestedAmount",new BigDecimal("100000.00"));
+        contract.put("termPeriods",52);
+        contract.put("expectedOperationalWeek",1);
+        contract.put("expectedBalance",new BigDecimal("5000.00"));
+        FinancialContractResponse created=Objects.requireNonNull(restTestClient.post().uri(financingPath(career.id(),"ATS")).headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(contract).exchange().expectStatus().isCreated().expectBody(FinancialContractResponse.class).returnResult().getResponseBody());
+        assertThat(careerRepository.findById(career.id()).orElseThrow().getBalance()).isEqualByComparingTo("105000.00");
+
+        adjustBalance(token,career.id(),new BigDecimal("105000.00"),BigDecimal.ZERO,1);
+        generateAtsPayslip(token,career.id(),1);
+        generateAtsPayslip(token,career.id(),2);
+
+        assertThat(contractRepository.findById(created.id()).orElseThrow().getStatus()).isEqualTo(FinancialContractStatus.DELINQUENT);
+        assertThat(eventRepository.findAllByContractIdOrderByRecordedAtAscIdAsc(created.id())).extracting(e->e.getEventType()).contains(FinancialContractEventType.DELINQUENT);
+
+        generateAtsPayslip(token,career.id(),3);
+        generateAtsPayslip(token,career.id(),4);
+
+        assertThat(contractRepository.findById(created.id()).orElseThrow().getStatus()).isEqualTo(FinancialContractStatus.DEFAULTED);
+        assertThat(eventRepository.findAllByContractIdOrderByRecordedAtAscIdAsc(created.id())).extracting(e->e.getEventType()).contains(FinancialContractEventType.DEFAULTED);
+        assertThat(paymentRepository.findAllByContractIdOrderByRecordedAtAscIdAsc(created.id())).hasSize(3).allSatisfy(p->assertThat(p.getPaymentType()).isEqualTo(FinancialPaymentType.AUTO));
+    }
+
     private void generateAtsPayslip(String token,UUID careerId,int week){restTestClient.post().uri(CAREERS+"/"+careerId+"/payslips?game=ATS").headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(Map.of("expectedOperationalWeek",week)).exchange().expectStatus().isCreated();}
     private void generateEts2Payslip(String token,UUID careerId,int month){restTestClient.post().uri(CAREERS+"/"+careerId+"/payslips?game=ETS2").headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(Map.of("expectedPayrollMonth",month)).exchange().expectStatus().isCreated();}
     private void closeEts2Week(String token,UUID careerId,int week){restTestClient.post().uri(CAREERS+"/"+careerId+"/payroll-periods/close?game=ETS2").headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(Map.of("expectedOperationalWeek",week)).exchange().expectStatus().isCreated();}
+    private void adjustBalance(String token,UUID careerId,BigDecimal expectedBalance,BigDecimal newBalance,int week){Map<String,Object> body=new LinkedHashMap<>();body.put("operationId",UUID.randomUUID());body.put("expectedOperationalWeek",week);body.put("expectedBalance",expectedBalance);body.put("newBalance",newBalance);body.put("note","Financing delinquency integration fixture");restTestClient.post().uri(CAREERS+"/"+careerId+"/finances/balance-adjustments?game=ATS").headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(body).exchange().expectStatus().isCreated();}
     private String financingPath(UUID careerId,String game){return CAREERS+"/"+careerId+"/financing/contracts?game="+game;}
 
     private CareerResponse createAtsCareer(String token){
