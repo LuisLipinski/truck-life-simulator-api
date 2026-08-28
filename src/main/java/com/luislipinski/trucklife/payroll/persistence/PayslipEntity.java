@@ -28,9 +28,11 @@ public class PayslipEntity {
     @Column(name = "benefits_amount", nullable = false, precision = 14, scale = 2) private BigDecimal benefitsAmount;
     @Column(name = "per_diem_amount", nullable = false, precision = 14, scale = 2) private BigDecimal perDiemAmount;
     @Column(name = "net_salary_amount", nullable = false, precision = 14, scale = 2) private BigDecimal netSalaryAmount;
-    @Column(name = "incident_deduction_amount", nullable = false, precision = 14, scale = 2)
-    private BigDecimal incidentDeductionAmount;
+    @Column(name = "incident_deduction_amount", nullable = false, precision = 14, scale = 2) private BigDecimal incidentDeductionAmount;
     @Column(name = "deposit_amount", nullable = false, precision = 14, scale = 2) private BigDecimal depositAmount;
+    @Column(name = "reserve_interest_amount", nullable = false, precision = 14, scale = 2) private BigDecimal reserveInterestAmount;
+    @Column(name = "reserve_contribution_amount", nullable = false, precision = 14, scale = 2) private BigDecimal reserveContributionAmount;
+    @Column(name = "balance_credit_amount", nullable = false, precision = 14, scale = 2) private BigDecimal balanceCreditAmount;
     @Column(name = "total_distance", nullable = false, precision = 14, scale = 2) private BigDecimal totalDistance;
     @Column(name = "elapsed_minutes", nullable = false) private int elapsedMinutes;
     @Column(name = "break_minutes", nullable = false) private int breakMinutes;
@@ -41,38 +43,20 @@ public class PayslipEntity {
 
     protected PayslipEntity() {}
 
-    public PayslipEntity(
-            UUID id,
-            UUID careerId,
-            CareerGame game,
-            Integer operationalWeek,
-            Integer payrollMonth,
-            int startOperationalWeek,
-            int endOperationalWeek,
-            short level,
-            String displayCurrency,
-            BigDecimal grossAmount,
-            BigDecimal taxAmount,
-            BigDecimal benefitsAmount,
-            BigDecimal perDiemAmount,
-            BigDecimal netSalaryAmount,
-            BigDecimal incidentDeductionAmount,
-            BigDecimal depositAmount,
-            BigDecimal totalDistance,
-            int elapsedMinutes,
-            int breakMinutes,
-            int workedMinutes,
-            int overrunMinutes,
-            String contextSnapshotJson,
-            Instant generatedAt
-    ) {
+    public PayslipEntity(UUID id, UUID careerId, CareerGame game, Integer operationalWeek, Integer payrollMonth,
+                         int startOperationalWeek, int endOperationalWeek, short level, String displayCurrency,
+                         BigDecimal grossAmount, BigDecimal taxAmount, BigDecimal benefitsAmount, BigDecimal perDiemAmount,
+                         BigDecimal netSalaryAmount, BigDecimal incidentDeductionAmount, BigDecimal depositAmount,
+                         BigDecimal reserveInterestAmount, BigDecimal reserveContributionAmount, BigDecimal balanceCreditAmount,
+                         BigDecimal totalDistance, int elapsedMinutes, int breakMinutes, int workedMinutes, int overrunMinutes,
+                         String contextSnapshotJson, Instant generatedAt) {
         this.id=id; this.careerId=careerId; this.game=game; this.operationalWeek=operationalWeek; this.payrollMonth=payrollMonth;
         this.startOperationalWeek=startOperationalWeek; this.endOperationalWeek=endOperationalWeek; this.level=level;
-        this.displayCurrency=displayCurrency; this.grossAmount=grossAmount; this.taxAmount=taxAmount;
-        this.benefitsAmount=benefitsAmount; this.perDiemAmount=perDiemAmount; this.netSalaryAmount=netSalaryAmount;
-        this.incidentDeductionAmount=incidentDeductionAmount; this.depositAmount=depositAmount;
-        this.totalDistance=totalDistance; this.elapsedMinutes=elapsedMinutes; this.breakMinutes=breakMinutes;
-        this.workedMinutes=workedMinutes; this.overrunMinutes=overrunMinutes;
+        this.displayCurrency=displayCurrency; this.grossAmount=grossAmount; this.taxAmount=taxAmount; this.benefitsAmount=benefitsAmount;
+        this.perDiemAmount=perDiemAmount; this.netSalaryAmount=netSalaryAmount; this.incidentDeductionAmount=incidentDeductionAmount;
+        this.depositAmount=depositAmount; this.reserveInterestAmount=reserveInterestAmount; this.reserveContributionAmount=reserveContributionAmount;
+        this.balanceCreditAmount=balanceCreditAmount; this.totalDistance=totalDistance; this.elapsedMinutes=elapsedMinutes;
+        this.breakMinutes=breakMinutes; this.workedMinutes=workedMinutes; this.overrunMinutes=overrunMinutes;
         this.contextSnapshotJson=contextSnapshotJson; this.generatedAt=generatedAt;
     }
 
@@ -82,10 +66,17 @@ public class PayslipEntity {
     public short getLevel(){return level;} public String getDisplayCurrency(){return displayCurrency;}
     public BigDecimal getGrossAmount(){return grossAmount;} public BigDecimal getTaxAmount(){return taxAmount;}
     public BigDecimal getBenefitsAmount(){return benefitsAmount;} public BigDecimal getPerDiemAmount(){return perDiemAmount;}
-    public BigDecimal getNetSalaryAmount(){return netSalaryAmount;}
-    public BigDecimal getIncidentDeductionAmount(){return incidentDeductionAmount;}
-    public BigDecimal getDepositAmount(){return depositAmount;} public BigDecimal getTotalDistance(){return totalDistance;}
-    public int getElapsedMinutes(){return elapsedMinutes;} public int getBreakMinutes(){return breakMinutes;}
-    public int getWorkedMinutes(){return workedMinutes;} public int getOverrunMinutes(){return overrunMinutes;}
-    public String getContextSnapshotJson(){return contextSnapshotJson;} public Instant getGeneratedAt(){return generatedAt;}
+    public BigDecimal getNetSalaryAmount(){return netSalaryAmount;} public BigDecimal getIncidentDeductionAmount(){return incidentDeductionAmount;}
+    public BigDecimal getDepositAmount(){return depositAmount;} public BigDecimal getReserveInterestAmount(){return reserveInterestAmount;}
+    public BigDecimal getReserveContributionAmount(){return reserveContributionAmount;} public BigDecimal getBalanceCreditAmount(){return balanceCreditAmount;}
+    public BigDecimal getTotalDistance(){return totalDistance;} public int getElapsedMinutes(){return elapsedMinutes;}
+    public int getBreakMinutes(){return breakMinutes;} public int getWorkedMinutes(){return workedMinutes;}
+    public int getOverrunMinutes(){return overrunMinutes;} public String getContextSnapshotJson(){return contextSnapshotJson;}
+    public Instant getGeneratedAt(){return generatedAt;}
+
+    public void applyEmergencyReserve(BigDecimal interestAmount, BigDecimal contributionAmount, BigDecimal balanceCreditAmount,
+                                      String contextSnapshotJson) {
+        this.reserveInterestAmount=interestAmount; this.reserveContributionAmount=contributionAmount;
+        this.balanceCreditAmount=balanceCreditAmount; this.contextSnapshotJson=contextSnapshotJson;
+    }
 }
