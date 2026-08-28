@@ -37,6 +37,7 @@ class PostgresMigrationTest {
         assertThat(columns("emergency_reserve")).contains("career_id","balance","annual_yield_rate","auto_contribution_enabled","auto_contribution_amount","display_currency","version");
         assertThat(columns("emergency_reserve_events")).contains("id","career_id","payslip_id","event_type","amount","balance_before","balance_after","operational_week","payroll_month","reason","recorded_at");
         assertThat(columns("ledger_entries")).contains("id","career_id","entry_type","source_type","source_id","entry_order","operational_week","payroll_month","amount","balance_delta","reserve_delta","balance_before","balance_after","reserve_balance_before","reserve_balance_after","display_currency","description","metadata_json","recorded_at");
+        assertThat(columnType("ledger_entries","entry_order")).isEqualTo("integer");
         List<String> indexes=jdbcTemplate.queryForList("SELECT indexname FROM pg_indexes WHERE schemaname='public'",String.class);
         assertThat(indexes).contains("idx_careers_user_game_created_at","idx_trips_career_week_created_at","idx_payslips_career_generated_at","idx_incidents_career_recorded_at","idx_academy_progress_career_completed","idx_qualifications_career_acquired","idx_monthly_expenses_career_type","idx_monthly_expense_applications_career_applied","idx_emergency_reserve_events_career_recorded","idx_ledger_entries_career_recorded","idx_ledger_entries_career_type");
         assertThat(constraints("monthly_expenses")).contains("fk_monthly_expenses_career","chk_monthly_expenses_type","chk_monthly_expenses_category","uq_monthly_expenses_career_category");
@@ -52,5 +53,6 @@ class PostgresMigrationTest {
     }
 
     private List<String> columns(String table){return jdbcTemplate.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=? ORDER BY ordinal_position",String.class,table);}
+    private String columnType(String table,String column){return jdbcTemplate.queryForObject("SELECT data_type FROM information_schema.columns WHERE table_schema='public' AND table_name=? AND column_name=?",String.class,table,column);}
     private List<String> constraints(String table){return jdbcTemplate.queryForList("SELECT constraint_name FROM information_schema.table_constraints WHERE table_schema='public' AND table_name=?",String.class,table);}
 }
