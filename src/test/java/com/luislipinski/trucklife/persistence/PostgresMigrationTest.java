@@ -16,7 +16,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(
+        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
+        properties = {
+                "info.app.commit=test-commit",
+                "info.app.branch=test-branch"
+        }
+)
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 @Testcontainers
@@ -316,13 +322,23 @@ class PostgresMigrationTest {
     }
 
     @Test
-    void exposesHealthAndOpenApiContracts() {
+    void exposesHealthDeploymentInfoAndOpenApiContracts() {
         restTestClient.get()
-                .uri("/actuator/health")
+                .uri("/actuator/health/readiness")
                 .exchange()
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.status").isEqualTo("UP");
+
+        restTestClient.get()
+                .uri("/actuator/info")
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.app.commit").isEqualTo("test-commit")
+                .jsonPath("$.app.branch").isEqualTo("test-branch")
+                .jsonPath("$.databaseSchema.currentVersion").isEqualTo("10")
+                .jsonPath("$.databaseSchema.pendingMigrations").isEqualTo(0);
 
         restTestClient.get()
                 .uri("/v3/api-docs")
