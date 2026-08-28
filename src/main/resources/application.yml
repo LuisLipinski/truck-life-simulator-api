@@ -81,3 +81,5 @@ info:
     name: ${spring.application.name}
     version: '@project.version@'
     description: '@project.description@'
+    commit: ${RENDER_GIT_COMMIT:local}
+    branch: ${RENDER_GIT_BRANCH:local}
