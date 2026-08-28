@@ -4,7 +4,7 @@ CREATE TABLE ledger_entries (
     entry_type VARCHAR(40) NOT NULL,
     source_type VARCHAR(40) NOT NULL,
     source_id UUID NOT NULL,
-    entry_order SMALLINT NOT NULL DEFAULT 10,
+    entry_order INTEGER NOT NULL DEFAULT 10,
     operational_week INTEGER NOT NULL,
     payroll_month INTEGER,
     amount NUMERIC(14,2) NOT NULL,
@@ -48,7 +48,7 @@ CREATE INDEX idx_ledger_entries_career_type ON ledger_entries (career_id, entry_
 
 WITH movement_entries AS (
     SELECT p.career_id, 'PAYSLIP_CREDIT'::text AS entry_type, 'PAYSLIP'::text AS source_type, p.id AS source_id,
-           30::smallint AS entry_order, p.end_operational_week AS operational_week, p.payroll_month,
+           30::integer AS entry_order, p.end_operational_week AS operational_week, p.payroll_month,
            p.balance_credit_amount AS amount, p.balance_credit_amount AS balance_delta,
            0.00::numeric(14,2) AS reserve_delta, NULL::numeric(14,2) AS reserve_balance_before,
            NULL::numeric(14,2) AS reserve_balance_after, p.display_currency,
@@ -61,13 +61,13 @@ WITH movement_entries AS (
     FROM payslips p
 
     UNION ALL
-    SELECT a.career_id, 'MONTHLY_EXPENSE', 'MONTHLY_EXPENSE_APPLICATION', a.id, 10::smallint,
+    SELECT a.career_id, 'MONTHLY_EXPENSE', 'MONTHLY_EXPENSE_APPLICATION', a.id, 10::integer,
            a.operational_week, a.payroll_month, -a.amount, -a.amount, 0.00::numeric(14,2), NULL, NULL,
            a.display_currency, 'Despesas mensais aplicadas', a.context_snapshot_json, a.applied_at
     FROM monthly_expense_applications a
 
     UNION ALL
-    SELECT i.career_id, 'INCIDENT_CHARGE', 'INCIDENT', i.id, 10::smallint,
+    SELECT i.career_id, 'INCIDENT_CHARGE', 'INCIDENT', i.id, 10::integer,
            i.operational_week, NULL::integer, -i.amount, -i.amount, 0.00::numeric(14,2), NULL, NULL,
            c.display_currency, LEFT('Ocorrência: ' || i.description,240),
            jsonb_build_object('backfilled',true,'incidentType',i.incident_type,'route',i.route_label,'chargeMethod',i.charge_method)::text,
@@ -76,13 +76,13 @@ WITH movement_entries AS (
     WHERE i.charge_method='BALANCE'
 
     UNION ALL
-    SELECT a.career_id, 'ACADEMY_FEE', 'ACADEMY_PROGRESS', a.id, 10::smallint,
+    SELECT a.career_id, 'ACADEMY_FEE', 'ACADEMY_PROGRESS', a.id, 10::integer,
            a.operational_week, NULL::integer, -a.fee_amount, -a.fee_amount, 0.00::numeric(14,2), NULL, NULL,
            a.display_currency, LEFT('Driving Academy: ' || a.module_name,240), a.context_snapshot_json, a.completed_at
     FROM academy_progress a
 
     UNION ALL
-    SELECT q.career_id, 'QUALIFICATION_FEE', 'QUALIFICATION', q.id, 10::smallint,
+    SELECT q.career_id, 'QUALIFICATION_FEE', 'QUALIFICATION', q.id, 10::integer,
            q.operational_week, NULL::integer, -q.fee_amount, -q.fee_amount, 0.00::numeric(14,2), NULL, NULL,
            q.display_currency, LEFT('Qualificação: ' || q.qualification_name,240), q.context_snapshot_json, q.acquired_at
     FROM qualifications q
@@ -94,7 +94,7 @@ WITH movement_entries AS (
                              WHEN 'AUTO_CONTRIBUTION' THEN 'RESERVE_AUTO_CONTRIBUTION'
                              ELSE 'RESERVE_INTEREST' END,
            'EMERGENCY_RESERVE_EVENT', e.id,
-           CASE e.event_type WHEN 'INTEREST' THEN 10 WHEN 'AUTO_CONTRIBUTION' THEN 20 ELSE 10 END::smallint,
+           CASE e.event_type WHEN 'INTEREST' THEN 10 WHEN 'AUTO_CONTRIBUTION' THEN 20 ELSE 10 END::integer,
            e.operational_week, e.payroll_month,
            CASE e.event_type WHEN 'MANUAL_DEPOSIT' THEN -e.amount WHEN 'MANUAL_WITHDRAWAL' THEN e.amount ELSE e.amount END,
            CASE e.event_type WHEN 'MANUAL_DEPOSIT' THEN -e.amount WHEN 'MANUAL_WITHDRAWAL' THEN e.amount ELSE 0.00::numeric(14,2) END,
@@ -114,7 +114,7 @@ movement_totals AS (
 ),
 opening_entries AS (
     SELECT c.id AS career_id, 'OPENING_BALANCE'::text AS entry_type, 'CAREER'::text AS source_type, c.id AS source_id,
-           0::smallint AS entry_order, 1 AS operational_week,
+           0::integer AS entry_order, 1 AS operational_week,
            CASE WHEN c.game_id='ETS2' THEN 1 ELSE NULL END::integer AS payroll_month,
            (c.balance-COALESCE(t.balance_delta_total,0.00))::numeric(14,2) AS amount,
            (c.balance-COALESCE(t.balance_delta_total,0.00))::numeric(14,2) AS balance_delta,
