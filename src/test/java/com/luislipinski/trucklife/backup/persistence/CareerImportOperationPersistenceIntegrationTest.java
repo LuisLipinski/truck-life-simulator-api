@@ -62,13 +62,13 @@ class CareerImportOperationPersistenceIntegrationTest {
                 CareerGame.ATS, 12, HASH_A, now
         ));
 
-        assertThat(importRepository.findByUserIdAndOperationId(firstOwner.getId(), sharedOperationId))
-                .contains(first);
-        assertThat(importRepository.findByUserIdAndOperationId(secondOwner.getId(), sharedOperationId))
-                .contains(second);
+        assertThat(importRepository.findByUserIdAndOperationId(firstOwner.getId(), sharedOperationId)
+                .orElseThrow().getId()).isEqualTo(first.getId());
+        assertThat(importRepository.findByUserIdAndOperationId(secondOwner.getId(), sharedOperationId)
+                .orElseThrow().getId()).isEqualTo(second.getId());
         assertThat(importRepository.findByUserIdAndGameAndSourceCareerId(
                 firstOwner.getId(), CareerGame.ATS, "local-career-1"
-        )).contains(first);
+        ).orElseThrow().getId()).isEqualTo(first.getId());
         assertThat(importRepository.findByIdAndUserId(first.getId(), secondOwner.getId())).isEmpty();
     }
 
