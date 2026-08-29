@@ -141,7 +141,7 @@ class FinancingPayrollIntegrationTest {
         assertThat(careerRepository.findById(career.id()).orElseThrow().getCurrentPayrollMonth()).isEqualTo(3);
     }
 
-    @Test void atsUncoveredInstallmentsBecomeDelinquentAndThenDefaultAfterThreeMissedPeriods(){
+    @Test void atsContractDefaultsWhenThreeInstallmentsRemainOverdueAfterAutomaticPayments(){
         UserEntity owner=saveUser("financing-default@example.com");
         String token=tokenIssuer.issue(owner,UUID.randomUUID()).token();
         CareerResponse career=createAtsCareer(token);
@@ -164,10 +164,12 @@ class FinancingPayrollIntegrationTest {
 
         generateAtsPayslip(token,career.id(),3);
         generateAtsPayslip(token,career.id(),4);
+        assertThat(contractRepository.findById(created.id()).orElseThrow().getStatus()).isEqualTo(FinancialContractStatus.DELINQUENT);
+        generateAtsPayslip(token,career.id(),5);
 
         assertThat(contractRepository.findById(created.id()).orElseThrow().getStatus()).isEqualTo(FinancialContractStatus.DEFAULTED);
         assertThat(eventRepository.findAllByContractIdOrderByRecordedAtAscIdAsc(created.id())).extracting(e->e.getEventType()).contains(FinancialContractEventType.DEFAULTED);
-        assertThat(paymentRepository.findAllByContractIdOrderByRecordedAtAscIdAsc(created.id())).hasSize(3).allSatisfy(p->assertThat(p.getPaymentType()).isEqualTo(FinancialPaymentType.AUTO));
+        assertThat(paymentRepository.findAllByContractIdOrderByRecordedAtAscIdAsc(created.id())).hasSize(4).allSatisfy(p->assertThat(p.getPaymentType()).isEqualTo(FinancialPaymentType.AUTO));
     }
 
     private void generateAtsPayslip(String token,UUID careerId,int week){restTestClient.post().uri(CAREERS+"/"+careerId+"/payslips?game=ATS").headers(h->h.setBearerAuth(token)).contentType(MediaType.APPLICATION_JSON).body(Map.of("expectedOperationalWeek",week)).exchange().expectStatus().isCreated();}
