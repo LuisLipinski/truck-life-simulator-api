@@ -15,7 +15,6 @@ import com.luislipinski.trucklife.identity.persistence.UserRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -190,7 +189,7 @@ class CareerImportOrchestrationIntegrationTest {
     }
 
     @Test
-    void rejectsHistoricalAggregateWithoutLeavingPartialCareerOrOperation() {
+    void rejectsMalformedHistoricalAggregateWithoutLeavingPartialCareerOrOperation() {
         UserEntity owner = saveUser("p4-orchestration-aggregate@example.com");
         CareerImportValidationRequest base = freshAtsRequest(UUID.randomUUID(), "career_local_history");
         Map<String, Object> state = new LinkedHashMap<>(base.state());
@@ -212,7 +211,7 @@ class CareerImportOrchestrationIntegrationTest {
                 .exchange()
                 .expectStatus().isBadRequest()
                 .expectBody()
-                .jsonPath("$.code").isEqualTo("CAREER_IMPORT_AGGREGATE_PENDING");
+                .jsonPath("$.code").isEqualTo("CAREER_IMPORT_INVALID");
 
         assertThat(careerRepository.count()).isZero();
         assertThat(importRepository.count()).isZero();
