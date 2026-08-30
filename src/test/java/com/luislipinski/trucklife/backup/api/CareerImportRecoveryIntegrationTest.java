@@ -95,7 +95,7 @@ class CareerImportRecoveryIntegrationTest {
 
         assertThat(recovered.game()).isEqualTo(CareerGame.ETS2);
         assertThat(recovered.careerId()).isEqualTo(ets2Created.careerId());
-        assertThat(recovered.careerId()).isNotEqualTo(atsCreated.careerId());
+        assertThat(recovered.careerId().equals(atsCreated.careerId())).isFalse();
         assertThat(recovered.summary().currentPayrollMonth()).isEqualTo(1);
         assertThat(careerRepository.count()).isEqualTo(2);
         assertThat(importRepository.count()).isEqualTo(2);
