@@ -140,6 +140,7 @@ jobs:
           import json
           import os
           import time
+          import urllib.parse
           import urllib.request
 
           base_url = os.environ["BASE_URL"].rstrip("/")
@@ -148,10 +149,23 @@ jobs:
           expected_flyway = os.environ["EXPECTED_FLYWAY_VERSION"]
           progression_path = "/api/v1/careers/{careerId}/progression"
 
-          def get_json(path):
+          def get_json(path, attempt):
+              separator = "&" if "?" in path else "?"
+              cache_buster = urllib.parse.urlencode(
+                  {
+                      "deployCheck": expected_sha,
+                      "attempt": attempt,
+                      "nonce": time.time_ns(),
+                  }
+              )
               request = urllib.request.Request(
-                  base_url + path,
-                  headers={"User-Agent": "truck-life-simulator-post-deploy-check"},
+                  f"{base_url}{path}{separator}{cache_buster}",
+                  headers={
+                      "User-Agent": "truck-life-simulator-post-deploy-check",
+                      "Accept": "application/json",
+                      "Cache-Control": "no-cache, no-store, max-age=0",
+                      "Pragma": "no-cache",
+                  },
               )
               with urllib.request.urlopen(request, timeout=10) as response:
                   if response.status != 200:
@@ -161,9 +175,9 @@ jobs:
           last_reasons = []
           for attempt in range(1, 41):
               try:
-                  readiness = get_json("/actuator/health/readiness")
-                  info = get_json("/actuator/info")
-                  openapi = get_json("/v3/api-docs")
+                  readiness = get_json("/actuator/health/readiness", attempt)
+                  info = get_json("/actuator/info", attempt)
+                  openapi = get_json("/v3/api-docs", attempt)
 
                   reasons = []
                   if readiness.get("status") != "UP":
