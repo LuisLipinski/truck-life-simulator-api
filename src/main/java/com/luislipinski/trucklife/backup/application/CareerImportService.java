@@ -41,6 +41,7 @@ public class CareerImportService {
     private final CareerImportOperationRepository importRepository;
     private final CareerRepository careerRepository;
     private final CareerOwnerLock ownerLock;
+    private final CareerImportAggregateMaterializer aggregateMaterializer;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -49,6 +50,7 @@ public class CareerImportService {
             CareerImportOperationRepository importRepository,
             CareerRepository careerRepository,
             CareerOwnerLock ownerLock,
+            CareerImportAggregateMaterializer aggregateMaterializer,
             ObjectMapper objectMapper,
             Clock clock
     ) {
@@ -56,6 +58,7 @@ public class CareerImportService {
         this.importRepository = importRepository;
         this.careerRepository = careerRepository;
         this.ownerLock = ownerLock;
+        this.aggregateMaterializer = aggregateMaterializer;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -64,7 +67,6 @@ public class CareerImportService {
     public CareerImportResponse importCareer(UUID userId, CareerImportValidationRequest request) {
         CareerImportValidationResponse validation = validationService.validate(request);
         CoreSnapshot snapshot = coreSnapshot(request, validation);
-        requireCoreOnlySnapshot(request, validation);
         String snapshotHash = snapshotHash(request);
 
         ownerLock.lock(userId);
@@ -136,7 +138,11 @@ public class CareerImportService {
                 now,
                 now
         );
+        if (qualified(request.state())) {
+            career.qualifyDangerousGoods(now);
+        }
         careerRepository.saveAndFlush(career);
+        aggregateMaterializer.materialize(operation, career, request, now);
 
         CareerImportResponse.Summary summary = summary(snapshot);
         operation.complete(careerId, serializeSummary(summary), now);
