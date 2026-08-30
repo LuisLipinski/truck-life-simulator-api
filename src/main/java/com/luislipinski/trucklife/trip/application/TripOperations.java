@@ -12,4 +12,6 @@ public interface TripOperations {
     List<TripEntity> list(UUID userId, CareerGame game, UUID careerId, Integer operationalWeek);
 
     TripEntity get(UUID userId, CareerGame game, UUID careerId, UUID tripId);
+
+    void delete(UUID userId, CareerGame game, UUID careerId, UUID tripId);
 }
