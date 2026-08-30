@@ -16,8 +16,10 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
@@ -128,8 +130,10 @@ public class CareerImportController {
     public ResponseEntity<CareerImportResponse> recover(
             @RequestParam CareerGame game,
             @RequestParam String sourceCareerId,
-            HttpServletRequest servletRequest
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse
     ) {
+        servletResponse.setHeader(HttpHeaders.CACHE_CONTROL, CacheControl.noStore().getHeaderValue());
         AuthenticatedAccount account = authorizedAccount(servletRequest);
         CareerImportResponse response = recoveryService.recover(account.userId(), game, sourceCareerId);
         return ResponseEntity.ok()
