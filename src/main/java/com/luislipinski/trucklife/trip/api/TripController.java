@@ -22,6 +22,7 @@ import org.springframework.http.CacheControl;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -118,6 +119,30 @@ public class TripController {
         return ResponseEntity.ok()
                 .cacheControl(CacheControl.noStore())
                 .body(response);
+    }
+
+    @DeleteMapping(path = "/{tripId}")
+    @Operation(summary = "Delete one trip from the current open operational week")
+    @ApiResponses({
+            @ApiResponse(responseCode = "204", description = "Trip deleted"),
+            @ApiResponse(responseCode = "401", description = "Access token missing or invalid"),
+            @ApiResponse(responseCode = "404", description = "Career or trip not found for this owner and game"),
+            @ApiResponse(responseCode = "409", description = "Trip belongs to a closed operational week", content = @Content(
+                    mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)
+            ))
+    })
+    public ResponseEntity<Void> delete(
+            @PathVariable("careerId") UUID careerId,
+            @PathVariable("tripId") UUID tripId,
+            @RequestParam(name = "game") CareerGame game,
+            HttpServletRequest servletRequest
+    ) {
+        AuthenticatedAccount account = authorizedAccount(servletRequest);
+        tripOperations.delete(account.userId(), game, careerId, tripId);
+        return ResponseEntity.noContent()
+                .cacheControl(CacheControl.noStore())
+                .build();
     }
 
     private AuthenticatedAccount authorizedAccount(HttpServletRequest request) {

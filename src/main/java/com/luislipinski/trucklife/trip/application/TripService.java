@@ -91,8 +91,23 @@ public class TripService implements TripOperations {
     @Transactional(readOnly = true)
     public TripEntity get(UUID userId, CareerGame game, UUID careerId, UUID tripId) {
         CareerEntity career = ownedCareer(userId, game, careerId);
-        return tripRepository.findByIdAndCareerId(tripId, career.getId())
-                .orElseThrow(() -> new ResourceNotFoundException("TRIP_NOT_FOUND", "The requested trip does not exist"));
+        return ownedTrip(career.getId(), tripId);
+    }
+
+    @Override
+    @Transactional
+    public void delete(UUID userId, CareerGame game, UUID careerId, UUID tripId) {
+        CareerEntity career = lockedOwnedCareer(userId, game, careerId);
+        TripEntity trip = ownedTrip(career.getId(), tripId);
+        if (trip.getOperationalWeek() != career.getCurrentOperationalWeek()) {
+            throw conflict(
+                    "TRIP_WEEK_LOCKED",
+                    "Trip week locked",
+                    "Trips from closed operational weeks cannot be deleted"
+            );
+        }
+        tripRepository.delete(trip);
+        tripRepository.flush();
     }
 
     private void validatePaymentEligibility(CareerEntity career, TripType type, TripPaymentCategory category) {
@@ -123,6 +138,11 @@ public class TripService implements TripOperations {
     private CareerEntity ownedCareer(UUID userId, CareerGame game, UUID careerId) {
         return careerRepository.findByIdAndUserIdAndGame(careerId, userId, game)
                 .orElseThrow(() -> new ResourceNotFoundException("CAREER_NOT_FOUND", "The requested career does not exist"));
+    }
+
+    private TripEntity ownedTrip(UUID careerId, UUID tripId) {
+        return tripRepository.findByIdAndCareerId(tripId, careerId)
+                .orElseThrow(() -> new ResourceNotFoundException("TRIP_NOT_FOUND", "The requested trip does not exist"));
     }
 
     private DayOfWeek day(String value, String field) {
@@ -200,5 +220,8 @@ public class TripService implements TripOperations {
     private String textOrEmpty(String value) { return value == null ? "" : value; }
     private ApiProblemException problem(String code, String title, String detail) {
         return new ApiProblemException(HttpStatus.BAD_REQUEST, code, title, detail);
+    }
+    private ApiProblemException conflict(String code, String title, String detail) {
+        return new ApiProblemException(HttpStatus.CONFLICT, code, title, detail);
     }
 }
