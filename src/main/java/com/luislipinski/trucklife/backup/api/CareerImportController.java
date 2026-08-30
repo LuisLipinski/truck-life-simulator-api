@@ -1,5 +1,6 @@
 package com.luislipinski.trucklife.backup.api;
 
+import com.luislipinski.trucklife.backup.application.CareerImportService;
 import com.luislipinski.trucklife.backup.application.CareerImportValidationService;
 import com.luislipinski.trucklife.identity.application.AccountAuthorization;
 import com.luislipinski.trucklife.identity.application.AuthenticatedAccount;
@@ -15,6 +16,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -31,13 +33,16 @@ public class CareerImportController {
 
     private final AccountAuthorization authorization;
     private final CareerImportValidationService validationService;
+    private final CareerImportService importService;
 
     public CareerImportController(
             AccountAuthorization authorization,
-            CareerImportValidationService validationService
+            CareerImportValidationService validationService,
+            CareerImportService importService
     ) {
         this.authorization = authorization;
         this.validationService = validationService;
+        this.importService = importService;
     }
 
     @PostMapping(
@@ -61,6 +66,36 @@ public class CareerImportController {
         authorizedAccount(servletRequest);
         CareerImportValidationResponse response = validationService.validate(request);
         return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(response);
+    }
+
+    @PostMapping(
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Operation(summary = "Import a supported local career snapshot transactionally and idempotently")
+    @ApiResponses({
+            @ApiResponse(responseCode = "201", description = "Local career imported into a new server-side career UUID"),
+            @ApiResponse(responseCode = "200", description = "The same completed idempotent operation was replayed"),
+            @ApiResponse(responseCode = "400", description = "Snapshot is invalid or contains aggregate sections not supported by this migration slice", content = @Content(
+                    mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)
+            )),
+            @ApiResponse(responseCode = "401", description = "Access token missing or invalid"),
+            @ApiResponse(responseCode = "409", description = "The operation id or local career identity conflicts with a prior import", content = @Content(
+                    mediaType = MediaType.APPLICATION_PROBLEM_JSON_VALUE,
+                    schema = @Schema(implementation = ProblemDetail.class)
+            ))
+    })
+    public ResponseEntity<CareerImportResponse> importCareer(
+            @Valid @RequestBody CareerImportValidationRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        AuthenticatedAccount account = authorizedAccount(servletRequest);
+        CareerImportResponse response = importService.importCareer(account.userId(), request);
+        HttpStatus status = response.idempotentReplay() ? HttpStatus.OK : HttpStatus.CREATED;
+        return ResponseEntity.status(status)
                 .cacheControl(CacheControl.noStore())
                 .body(response);
     }
