@@ -14,6 +14,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Function;
 
 public record CareerImportValidationRequest(
         @NotNull UUID operationId,
@@ -150,9 +151,12 @@ public record CareerImportValidationRequest(
         }
     }
 
-    private static List<?> normalizeList(Object value, java.util.function.Function<Object, Object> normalizer) {
+    private static Object normalizeList(Object value, Function<Object, Object> normalizer) {
+        if (value == null) {
+            return List.of();
+        }
         if (!(value instanceof List<?> list)) {
-            return value == null ? List.of() : List.of(value);
+            return value;
         }
         return list.stream().map(normalizer).toList();
     }
