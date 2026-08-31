@@ -153,7 +153,9 @@ class PayslipApiIntegrationTest {
         PayslipResponse payslip = generate(token, career.id(), CareerGame.ATS, Map.of("expectedOperationalWeek", 1));
         assertThat(payslip.grossAmount()).isEqualByComparingTo("1000.00");
         assertThat(payslip.benefitsAmount()).isEqualByComparingTo("50.00");
-        assertThat(payslip.contextSnapshot()).containsEntry("payrollLevel1GrossOverride", new BigDecimal("1000.00"));
+        assertThat(payslip.contextSnapshot()).containsKey("payrollLevel1GrossOverride");
+        assertThat((BigDecimal) payslip.contextSnapshot().get("payrollLevel1GrossOverride"))
+                .isEqualByComparingTo("1000.00");
         var persisted = careerRepository.findById(career.id()).orElseThrow();
         assertThat(persisted.getPayrollLevel1GrossOverride()).isEqualByComparingTo("1000.00");
     }
