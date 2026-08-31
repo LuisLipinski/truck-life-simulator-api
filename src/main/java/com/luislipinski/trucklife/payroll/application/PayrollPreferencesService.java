@@ -15,6 +15,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.Clock;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -71,7 +72,7 @@ public class PayrollPreferencesService {
                                         BigDecimal benefits, BigDecimal perDiemRate) {
         CareerEntity career = lockedCareer(userId, game, careerId);
         validateContext(career, expectedOperationalWeek, expectedPayrollMonth);
-        if (game == CareerGame.ETS2 && currentMonthPeriods(career).size() > 0) {
+        if (game == CareerGame.ETS2 && !currentMonthPeriods(career).isEmpty()) {
             throw conflict("PAYROLL_SETTINGS_MONTH_STARTED", "Payroll month already started",
                     "ETS2 payroll preferences can be changed before closing the first week of the operational payroll month");
         }
@@ -83,8 +84,7 @@ public class PayrollPreferencesService {
     @Transactional(readOnly = true)
     public Preview preview(UUID userId, CareerGame game, UUID careerId) {
         CareerEntity career = ownedCareer(userId, game, careerId);
-        if (game == CareerGame.ATS) return previewAts(career);
-        return previewEts2(career);
+        return game == CareerGame.ATS ? previewAts(career) : previewEts2(career);
     }
 
     private Preview previewAts(CareerEntity career) {
@@ -209,7 +209,7 @@ public class PayrollPreferencesService {
                     calculation.taxTotal(), calculation.benefits(), calculation.perDiem(), calculation.netSalary(),
                     incidentDeduction, calculation.deposit().subtract(incidentDeduction).max(BigDecimal.ZERO),
                     calculation.totalDistance(), calculation.elapsedMinutes(), calculation.breakMinutes(),
-                    calculation.workedMinutes(), calculation.overrunMinutes(), calculation.lines(), Map.copyOf(context));
+                    calculation.workedMinutes(), calculation.overrunMinutes(), calculation.lines(), new LinkedHashMap<>(context));
         }
     }
 }
