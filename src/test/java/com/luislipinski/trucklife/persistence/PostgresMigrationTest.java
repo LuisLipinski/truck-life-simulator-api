@@ -22,7 +22,7 @@ class PostgresMigrationTest {
     @Container @ServiceConnection static final PostgreSQLContainer POSTGRES=new PostgreSQLContainer(DockerImageName.parse("postgres:18-alpine"));
     @Autowired JdbcTemplate jdbcTemplate;@Autowired RestTestClient restTestClient;
 
-    @Test void appliesAllDomainMigrationsThroughCareerImportArchiveV15(){
+    @Test void appliesAllDomainMigrationsThroughPayrollPreferencesV16(){
         Integer tableCount=jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN (
                 'platform_metadata','users','refresh_tokens','user_action_tokens','careers','career_events','trips','payroll_periods','payslips','payslip_lines',
@@ -30,8 +30,9 @@ class PostgresMigrationTest {
                 'financial_contracts','financial_installments','financial_payments','financial_contract_events','career_import_operations','career_import_archives')
                 """,Integer.class);
         String latest=jdbcTemplate.queryForObject("SELECT version FROM flyway_schema_history WHERE success=TRUE AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1",String.class);
-        assertThat(tableCount).isEqualTo(25);assertThat(latest).isEqualTo("15");
-        assertThat(columns("careers")).contains("current_operational_week","current_payroll_month","dangerous_goods_qualified");
+        assertThat(tableCount).isEqualTo(25);assertThat(latest).isEqualTo("16");
+        assertThat(columns("careers")).contains("current_operational_week","current_payroll_month","dangerous_goods_qualified",
+                "payroll_level1_gross_override","payroll_route_overrun_rate_override","payroll_benefits_override","payroll_per_diem_rate_override");
         assertThat(columns("payslips")).contains("incident_deduction_amount","reserve_interest_amount","reserve_contribution_amount","balance_credit_amount","context_snapshot_json");
         assertThat(columns("monthly_expenses")).contains("career_id","expense_type","category","amount","included","display_currency","policy_version","context_snapshot_json","version");
         assertThat(columns("monthly_expense_applications")).contains("id","career_id","operational_week","payroll_month","amount","context_snapshot_json","applied_at");
@@ -47,6 +48,7 @@ class PostgresMigrationTest {
         assertThat(columns("career_import_archives")).contains("import_operation_id","career_id","source_version","snapshot_json","archived_at");
         List<String> indexes=jdbcTemplate.queryForList("SELECT indexname FROM pg_indexes WHERE schemaname='public'",String.class);
         assertThat(indexes).contains("idx_careers_user_game_created_at","idx_trips_career_week_created_at","idx_payslips_career_generated_at","idx_incidents_career_recorded_at","idx_academy_progress_career_completed","idx_qualifications_career_acquired","idx_monthly_expenses_career_type","idx_monthly_expense_applications_career_applied","idx_emergency_reserve_events_career_recorded","idx_ledger_entries_career_recorded","idx_ledger_entries_career_type","idx_financial_contracts_career_status","idx_financial_installments_contract_due","idx_financial_payments_contract_recorded","idx_financial_contract_events_contract_recorded","idx_career_import_operations_user_created","idx_career_import_operations_imported_career","idx_career_import_archives_archived_at");
+        assertThat(constraints("careers")).contains("chk_careers_payroll_level1_gross_override","chk_careers_payroll_route_overrun_rate_override","chk_careers_payroll_benefits_override","chk_careers_payroll_per_diem_rate_override");
         assertThat(constraints("monthly_expenses")).contains("fk_monthly_expenses_career","chk_monthly_expenses_type","chk_monthly_expenses_category","uq_monthly_expenses_career_category");
         assertThat(constraints("emergency_reserve_events")).contains("fk_emergency_reserve_events_career","fk_emergency_reserve_events_payslip","chk_emergency_reserve_events_type","uq_emergency_reserve_payslip_event");
         assertThat(constraints("payslips")).contains("chk_payslips_reserve_interest","chk_payslips_reserve_contribution","chk_payslips_balance_credit");
@@ -61,7 +63,7 @@ class PostgresMigrationTest {
     @Test void exposesTheAppliedFlywayStateWithoutSensitiveDatabaseData(){
         restTestClient.get().uri("/actuator/info").exchange().expectStatus().isOk().expectBody()
                 .jsonPath("$.app.commit").isEqualTo("test-commit").jsonPath("$.app.branch").isEqualTo("test-branch")
-                .jsonPath("$.databaseSchema.currentVersion").isEqualTo("15").jsonPath("$.databaseSchema.pendingMigrations").isEqualTo(0);
+                .jsonPath("$.databaseSchema.currentVersion").isEqualTo("16").jsonPath("$.databaseSchema.pendingMigrations").isEqualTo(0);
     }
 
     private List<String> columns(String table){return jdbcTemplate.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=? ORDER BY ordinal_position",String.class,table);}

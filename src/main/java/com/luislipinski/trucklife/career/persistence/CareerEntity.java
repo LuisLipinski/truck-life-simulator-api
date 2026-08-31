@@ -40,6 +40,10 @@ public class CareerEntity {
     @Column(name = "current_operational_week", nullable = false) private int currentOperationalWeek;
     @Column(name = "current_payroll_month") private Integer currentPayrollMonth;
     @Column(name = "dangerous_goods_qualified", nullable = false) private boolean dangerousGoodsQualified;
+    @Column(name = "payroll_level1_gross_override", precision = 14, scale = 2) private BigDecimal payrollLevel1GrossOverride;
+    @Column(name = "payroll_route_overrun_rate_override", precision = 14, scale = 2) private BigDecimal payrollRouteOverrunRateOverride;
+    @Column(name = "payroll_benefits_override", precision = 14, scale = 2) private BigDecimal payrollBenefitsOverride;
+    @Column(name = "payroll_per_diem_rate_override", precision = 14, scale = 2) private BigDecimal payrollPerDiemRateOverride;
     @Column(name = "created_at", nullable = false) private Instant createdAt;
     @Column(name = "updated_at", nullable = false) private Instant updatedAt;
     @Version @Column(nullable = false) private long version;
@@ -73,6 +77,10 @@ public class CareerEntity {
     public BigDecimal getCityCostFactor(){return cityCostFactor;} public BigDecimal getCitySalaryFactor(){return citySalaryFactor;}
     public int getCurrentOperationalWeek(){return currentOperationalWeek;} public Integer getCurrentPayrollMonth(){return currentPayrollMonth;}
     public boolean isDangerousGoodsQualified(){return dangerousGoodsQualified;}
+    public BigDecimal getPayrollLevel1GrossOverride(){return payrollLevel1GrossOverride;}
+    public BigDecimal getPayrollRouteOverrunRateOverride(){return payrollRouteOverrunRateOverride;}
+    public BigDecimal getPayrollBenefitsOverride(){return payrollBenefitsOverride;}
+    public BigDecimal getPayrollPerDiemRateOverride(){return payrollPerDiemRateOverride;}
     public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;} public long getVersion(){return version;}
 
     public void updateProfile(String driverName, String biography, Instant updatedAt) {
@@ -89,6 +97,15 @@ public class CareerEntity {
         this.stateCode=stateCode; this.countryCode=countryCode; this.baseCity=baseCity; this.baseCurrency=baseCurrency;
         this.exchangeRate=exchangeRate; this.exchangeRateAsOf=exchangeRateAsOf; this.cityMarketVersion=cityMarketVersion;
         this.cityMarketLabel=cityMarketLabel; this.cityCostFactor=cityCostFactor; this.citySalaryFactor=citySalaryFactor;
+        this.updatedAt=updatedAt;
+    }
+
+    public void updatePayrollSettings(BigDecimal level1Gross, BigDecimal routeOverrunRate, BigDecimal benefits,
+                                      BigDecimal perDiemRate, Instant updatedAt) {
+        this.payrollLevel1GrossOverride=level1Gross;
+        this.payrollRouteOverrunRateOverride=routeOverrunRate;
+        this.payrollBenefitsOverride=benefits;
+        this.payrollPerDiemRateOverride=perDiemRate;
         this.updatedAt=updatedAt;
     }
 

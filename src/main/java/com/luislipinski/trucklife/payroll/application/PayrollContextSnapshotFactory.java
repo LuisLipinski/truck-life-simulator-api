@@ -36,6 +36,10 @@ final class PayrollContextSnapshotFactory {
         snapshot.put("cityMarketKnown", cityMarket.known());
         snapshot.put("cityCostFactor", cityMarket.costFactor());
         snapshot.put("citySalaryFactor", cityMarket.salaryFactor());
+        snapshot.put("payrollLevel1GrossOverride", career.getPayrollLevel1GrossOverride());
+        snapshot.put("payrollRouteOverrunRateOverride", career.getPayrollRouteOverrunRateOverride());
+        snapshot.put("payrollBenefitsOverride", career.getPayrollBenefitsOverride());
+        snapshot.put("payrollPerDiemRateOverride", career.getPayrollPerDiemRateOverride());
         return snapshot;
     }
 
