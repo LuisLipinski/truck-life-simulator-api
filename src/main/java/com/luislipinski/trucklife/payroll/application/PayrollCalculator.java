@@ -36,6 +36,37 @@ public class PayrollCalculator {
                 : mileage(game, context, safeTrips, time);
     }
 
+    public Settings settings(CareerGame game, Context context) {
+        validateContext(game, context);
+        BigDecimal exchangeRate = context.exchangeRate();
+        BigDecimal salaryFactor = context.citySalaryFactor();
+        BigDecimal defaultGross;
+        BigDecimal defaultOverrun;
+        BigDecimal defaultBenefits;
+        BigDecimal defaultPerDiem;
+        if (game == CareerGame.ATS) {
+            PayrollPolicyCatalog.StatePolicy policy = requireAtsPolicy(context.stateCode());
+            defaultGross = money(policy.weeklyGross().multiply(salaryFactor).multiply(exchangeRate));
+            defaultOverrun = money(policy.weeklyGross().divide(bd("40"), 12, RoundingMode.HALF_UP)
+                    .multiply(salaryFactor).multiply(exchangeRate));
+            defaultBenefits = money(PayrollPolicyCatalog.ATS_BENEFITS.multiply(exchangeRate));
+            defaultPerDiem = money(policy.perDiemRate().multiply(exchangeRate));
+        } else {
+            PayrollPolicyCatalog.CountryPolicy policy = requireEtsPolicy(context.countryCode());
+            defaultGross = money(policy.level1Gross().multiply(salaryFactor).multiply(exchangeRate));
+            defaultOverrun = money(policy.routeOverrunRate().multiply(salaryFactor).multiply(exchangeRate));
+            defaultBenefits = money(BigDecimal.ZERO);
+            defaultPerDiem = money(policy.perDiemRate().multiply(exchangeRate));
+        }
+        return new Settings(
+                defaultGross, defaultOverrun, defaultBenefits, defaultPerDiem,
+                preferred(context.level1GrossOverride(), defaultGross),
+                preferred(context.routeOverrunRateOverride(), defaultOverrun),
+                preferred(context.benefitsOverride(), defaultBenefits),
+                preferred(context.perDiemRateOverride(), defaultPerDiem)
+        );
+    }
+
     private Calculation levelOne(CareerGame game, Context context, List<TripEntity> trips, TimeSummary time) {
         BigDecimal exchangeRate = context.exchangeRate();
         BigDecimal salaryFactor = context.citySalaryFactor();
@@ -54,6 +85,9 @@ public class PayrollCalculator {
             overrunRate = money(policy.routeOverrunRate().multiply(salaryFactor).multiply(exchangeRate));
             benefits = money(BigDecimal.ZERO);
         }
+        baseSalary = preferred(context.level1GrossOverride(), baseSalary);
+        overrunRate = preferred(context.routeOverrunRateOverride(), overrunRate);
+        benefits = preferred(context.benefitsOverride(), benefits);
         BigDecimal overrunHours = bd(time.overrunMinutes()).divide(bd("60"), 4, RoundingMode.HALF_UP);
         BigDecimal overrunPay = money(overrunRate.multiply(bd(time.overrunMinutes()))
                 .divide(bd("60"), 12, RoundingMode.HALF_UP));
@@ -113,8 +147,9 @@ public class PayrollCalculator {
         }
         Map<String, BigDecimal> taxes = taxes(game, context, gross);
         BigDecimal taxTotal = sum(taxes.values());
-        BigDecimal benefits = game == CareerGame.ATS
+        BigDecimal defaultBenefits = game == CareerGame.ATS
                 ? money(PayrollPolicyCatalog.ATS_BENEFITS.multiply(context.exchangeRate())) : money(BigDecimal.ZERO);
+        BigDecimal benefits = preferred(context.benefitsOverride(), defaultBenefits);
         BigDecimal netSalary = money(gross.subtract(taxTotal).subtract(benefits));
         BigDecimal deposit = money(netSalary.add(perDiem).max(BigDecimal.ZERO));
         addTaxLines(lines, taxes);
@@ -145,7 +180,8 @@ public class PayrollCalculator {
         BigDecimal baseRate = game == CareerGame.ATS
                 ? requireAtsPolicy(context.stateCode()).perDiemRate()
                 : requireEtsPolicy(context.countryCode()).perDiemRate();
-        return money(baseRate.multiply(context.exchangeRate()));
+        BigDecimal policyValue = money(baseRate.multiply(context.exchangeRate()));
+        return preferred(context.perDiemRateOverride(), policyValue);
     }
 
     private Map<String, BigDecimal> taxes(CareerGame game, Context context, BigDecimal displayGross) {
@@ -470,6 +506,9 @@ public class PayrollCalculator {
         return money(total);
     }
 
+    private static BigDecimal preferred(BigDecimal override, BigDecimal fallback) {
+        return money(override == null ? fallback : override.max(BigDecimal.ZERO));
+    }
     private static PayrollPolicyCatalog.TaxBracket bracket(String upperLimit, String rate) {
         return new PayrollPolicyCatalog.TaxBracket(bd(upperLimit), bd(rate));
     }
@@ -481,9 +520,20 @@ public class PayrollCalculator {
     private static BigDecimal rate4(BigDecimal value) { return value.setScale(4, RoundingMode.HALF_UP); }
 
     public record Context(short currentLevel, String stateCode, String countryCode, String baseCurrency,
-                          String displayCurrency, BigDecimal exchangeRate, BigDecimal citySalaryFactor) {
+                          String displayCurrency, BigDecimal exchangeRate, BigDecimal citySalaryFactor,
+                          BigDecimal level1GrossOverride, BigDecimal routeOverrunRateOverride,
+                          BigDecimal benefitsOverride, BigDecimal perDiemRateOverride) {
+        public Context(short currentLevel, String stateCode, String countryCode, String baseCurrency,
+                       String displayCurrency, BigDecimal exchangeRate, BigDecimal citySalaryFactor) {
+            this(currentLevel, stateCode, countryCode, baseCurrency, displayCurrency, exchangeRate, citySalaryFactor,
+                    null, null, null, null);
+        }
         public Context { citySalaryFactor = citySalaryFactor == null ? BigDecimal.ONE : citySalaryFactor; }
     }
+    public record Settings(BigDecimal defaultLevel1Gross, BigDecimal defaultRouteOverrunRate,
+                           BigDecimal defaultBenefits, BigDecimal defaultPerDiemRate,
+                           BigDecimal level1Gross, BigDecimal routeOverrunRate,
+                           BigDecimal benefits, BigDecimal perDiemRate) {}
     public record Line(String code, String label, PayslipLineType type, BigDecimal amount,
                        BigDecimal quantity, BigDecimal rate) {}
     public record Calculation(short level, BigDecimal gross, BigDecimal taxTotal, BigDecimal benefits,
