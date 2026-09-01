@@ -200,6 +200,7 @@ public class PayrollPreferencesService {
                           BigDecimal benefitsAmount, BigDecimal perDiemAmount, BigDecimal netSalaryAmount,
                           BigDecimal incidentDeductionAmount, BigDecimal depositAmount, BigDecimal totalDistance,
                           int elapsedMinutes, int breakMinutes, int workedMinutes, int overrunMinutes,
+                          List<PayrollCalculator.DailyWorkBreakdown> dailyWorkBreakdown,
                           List<PayrollCalculator.Line> lines, Map<String,Object> contextSnapshot) {
         static Preview from(boolean ready, Integer week, Integer month, List<Integer> weeks,
                             PayrollCalculator.Calculation calculation, BigDecimal incidentDeduction,
@@ -209,7 +210,8 @@ public class PayrollPreferencesService {
                     calculation.taxTotal(), calculation.benefits(), calculation.perDiem(), calculation.netSalary(),
                     incidentDeduction, calculation.deposit().subtract(incidentDeduction).max(BigDecimal.ZERO),
                     calculation.totalDistance(), calculation.elapsedMinutes(), calculation.breakMinutes(),
-                    calculation.workedMinutes(), calculation.overrunMinutes(), calculation.lines(), new LinkedHashMap<>(context));
+                    calculation.workedMinutes(), calculation.overrunMinutes(), calculation.dailyWorkBreakdown(),
+                    calculation.lines(), new LinkedHashMap<>(context));
         }
     }
 }

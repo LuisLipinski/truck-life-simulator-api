@@ -98,6 +98,7 @@ class PayslipApiIntegrationTest {
                 .containsEntry("cityMarketKey", "major")
                 .containsEntry("cityMarketKnown", true)
                 .containsEntry("incidentDeductionsIncluded", false);
+        assertThat(payslip.contextSnapshot()).containsKey("dailyWorkBreakdown");
         assertThat(new BigDecimal(String.valueOf(payslip.contextSnapshot().get("citySalaryFactor"))))
                 .isEqualByComparingTo("1.05");
         assertThat(payslip.lines()).extracting(PayslipResponse.LineResponse::code)
