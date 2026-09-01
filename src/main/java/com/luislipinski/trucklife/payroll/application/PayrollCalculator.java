@@ -117,7 +117,7 @@ public class PayrollCalculator {
         }
         return new Calculation(context.currentLevel(), gross, taxTotal, benefits, perDiem, netSalary, deposit,
                 totalDistance(trips), time.elapsedMinutes(), time.breakMinutes(), time.workedMinutes(),
-                time.overrunMinutes(), List.copyOf(lines));
+                time.overrunMinutes(), time.dailyWorkBreakdown(), List.copyOf(lines));
     }
 
     private Calculation mileage(CareerGame game, Context context, List<TripEntity> trips, TimeSummary time) {
@@ -158,7 +158,7 @@ public class PayrollCalculator {
         }
         return new Calculation(context.currentLevel(), gross, taxTotal, benefits, perDiem, netSalary, deposit,
                 totalDistance(trips), time.elapsedMinutes(), time.breakMinutes(), time.workedMinutes(),
-                time.overrunMinutes(), List.copyOf(lines));
+                time.overrunMinutes(), time.dailyWorkBreakdown(), List.copyOf(lines));
     }
 
     private Map<TripPaymentCategory, BigDecimal> payRates(CareerGame game, Context context) {
@@ -318,8 +318,8 @@ public class PayrollCalculator {
     }
 
     private TimeSummary summarizeTime(CareerGame game, List<TripEntity> trips) {
-        Map<Integer, DayTotals> totalsByDay = new LinkedHashMap<>();
-        Set<Integer> perDiemDays = new LinkedHashSet<>();
+        Map<OperationalDay, DayTotals> totalsByDay = new LinkedHashMap<>();
+        Set<OperationalDay> perDiemDays = new LinkedHashSet<>();
         for (TripEntity trip : trips) {
             List<Segment> segments = segments(trip);
             if (segments.isEmpty()) continue;
@@ -328,26 +328,39 @@ public class PayrollCalculator {
             int[] allocations = allocateBreaks(segments, breakMinutes);
             for (int index = 0; index < segments.size(); index++) {
                 Segment segment = segments.get(index);
-                DayTotals totals = totalsByDay.computeIfAbsent(segment.dayIndex(), ignored -> new DayTotals());
+                OperationalDay operationalDay = operationalDay(trip.getOperationalWeek(), segment.dayIndex());
+                DayTotals totals = totalsByDay.computeIfAbsent(operationalDay, ignored -> new DayTotals());
                 totals.elapsedMinutes += segment.minutes();
                 totals.breakMinutes += allocations[index];
             }
             int departureIndex = trip.getDepartureDay().getValue() - 1;
             int arrivalIndex = adjustedArrivalDayIndex(trip.getDepartureDay(), trip.getArrivalDay());
             if (arrivalIndex > departureIndex) {
-                for (int day = departureIndex; day <= arrivalIndex; day++) perDiemDays.add(day);
+                for (int day = departureIndex; day <= arrivalIndex; day++) {
+                    perDiemDays.add(operationalDay(trip.getOperationalWeek(), day));
+                }
             }
         }
         int elapsed = 0, breaks = 0, worked = 0, overrun = 0;
-        for (DayTotals totals : totalsByDay.values()) {
+        List<DailyWorkBreakdown> dailyWorkBreakdown = new ArrayList<>();
+        for (Map.Entry<OperationalDay, DayTotals> entry : totalsByDay.entrySet()) {
+            DayTotals totals = entry.getValue();
             int dayBreak = Math.min(totals.elapsedMinutes, totals.breakMinutes);
             int dayWorked = Math.max(0, totals.elapsedMinutes - dayBreak);
+            int dayOverrun = Math.max(0, dayWorked - DAILY_WORK_MINUTES);
             elapsed += totals.elapsedMinutes;
             breaks += dayBreak;
             worked += dayWorked;
-            overrun += Math.max(0, dayWorked - DAILY_WORK_MINUTES);
+            overrun += dayOverrun;
+            dailyWorkBreakdown.add(new DailyWorkBreakdown(
+                    entry.getKey().operationalWeek(), DayOfWeek.of(entry.getKey().dayIndex() + 1),
+                    totals.elapsedMinutes, dayBreak, dayWorked, dayOverrun));
         }
-        return new TimeSummary(elapsed, breaks, worked, overrun, perDiemDays.size());
+        return new TimeSummary(elapsed, breaks, worked, overrun, perDiemDays.size(), List.copyOf(dailyWorkBreakdown));
+    }
+
+    private OperationalDay operationalDay(int operationalWeek, int relativeDayIndex) {
+        return new OperationalDay(operationalWeek + Math.floorDiv(relativeDayIndex, 7), Math.floorMod(relativeDayIndex, 7));
     }
 
     private List<Segment> segments(TripEntity trip) {
@@ -539,10 +552,15 @@ public class PayrollCalculator {
     public record Calculation(short level, BigDecimal gross, BigDecimal taxTotal, BigDecimal benefits,
                               BigDecimal perDiem, BigDecimal netSalary, BigDecimal deposit,
                               BigDecimal totalDistance, int elapsedMinutes, int breakMinutes,
-                              int workedMinutes, int overrunMinutes, List<Line> lines) {}
+                              int workedMinutes, int overrunMinutes, List<DailyWorkBreakdown> dailyWorkBreakdown,
+                              List<Line> lines) {}
+    public record DailyWorkBreakdown(int operationalWeek, DayOfWeek day, int elapsedMinutes,
+                                     int breakMinutes, int workedMinutes, int overrunMinutes) {}
     private record Segment(int dayIndex, int minutes) {}
     private record Remainder(int index, long value) {}
+    private record OperationalDay(int operationalWeek, int dayIndex) {}
     private record TimeSummary(int elapsedMinutes, int breakMinutes, int workedMinutes,
-                               int overrunMinutes, int eligiblePerDiemDays) {}
+                               int overrunMinutes, int eligiblePerDiemDays,
+                               List<DailyWorkBreakdown> dailyWorkBreakdown) {}
     private static final class DayTotals { private int elapsedMinutes; private int breakMinutes; }
 }

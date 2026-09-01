@@ -3,6 +3,7 @@ package com.luislipinski.trucklife.payroll.api;
 import com.luislipinski.trucklife.payroll.application.PayrollPreferencesService;
 import com.luislipinski.trucklife.payroll.domain.PayslipLineType;
 import java.math.BigDecimal;
+import java.time.DayOfWeek;
 import java.util.List;
 import java.util.Map;
 
@@ -25,6 +26,7 @@ public record PayrollPreviewResponse(
         int breakMinutes,
         int workedMinutes,
         int overrunMinutes,
+        List<DailyWorkBreakdownResponse> dailyWorkBreakdown,
         List<LineResponse> lines,
         Map<String,Object> contextSnapshot
 ) {
@@ -34,8 +36,18 @@ public record PayrollPreviewResponse(
                 preview.displayCurrency(), preview.grossAmount(), preview.taxAmount(), preview.benefitsAmount(),
                 preview.perDiemAmount(), preview.netSalaryAmount(), preview.incidentDeductionAmount(), preview.depositAmount(),
                 preview.totalDistance(), preview.elapsedMinutes(), preview.breakMinutes(), preview.workedMinutes(),
-                preview.overrunMinutes(), preview.lines().stream().map(LineResponse::from).toList(), preview.contextSnapshot()
+                preview.overrunMinutes(), preview.dailyWorkBreakdown().stream().map(DailyWorkBreakdownResponse::from).toList(),
+                preview.lines().stream().map(LineResponse::from).toList(), preview.contextSnapshot()
         );
+    }
+
+    public record DailyWorkBreakdownResponse(int operationalWeek, DayOfWeek day, int elapsedMinutes,
+                                             int breakMinutes, int workedMinutes, int overrunMinutes) {
+        static DailyWorkBreakdownResponse from(
+                com.luislipinski.trucklife.payroll.application.PayrollCalculator.DailyWorkBreakdown day) {
+            return new DailyWorkBreakdownResponse(day.operationalWeek(), day.day(), day.elapsedMinutes(),
+                    day.breakMinutes(), day.workedMinutes(), day.overrunMinutes());
+        }
     }
 
     public record LineResponse(String code, String label, PayslipLineType type, BigDecimal amount,

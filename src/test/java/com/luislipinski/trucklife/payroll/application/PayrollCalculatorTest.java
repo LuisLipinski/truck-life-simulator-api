@@ -56,7 +56,23 @@ class PayrollCalculatorTest {
         assertThat(result.elapsedMinutes()).isEqualTo(660);
         assertThat(result.breakMinutes()).isEqualTo(90);
         assertThat(result.workedMinutes()).isEqualTo(570);
+        assertThat(result.dailyWorkBreakdown()).extracting(PayrollCalculator.DailyWorkBreakdown::day)
+                .containsExactly(DayOfWeek.SUNDAY, DayOfWeek.MONDAY);
         assertThat(result.gross()).isPositive();
+    }
+
+    @Test
+    void keepsEqualWeekdaysFromDifferentOperationalWeeksSeparate() {
+        var result = calculator.calculate(CareerGame.ETS2, context((short)1,"","DE","EUR","EUR","1","1"),
+                List.of(
+                        trip(1,DayOfWeek.MONDAY,"08:00",DayOfWeek.MONDAY,"15:00",TripPaymentCategory.NORMAL,"100",0),
+                        trip(2,DayOfWeek.MONDAY,"08:00",DayOfWeek.MONDAY,"15:00",TripPaymentCategory.NORMAL,"100",0)));
+
+        assertThat(result.workedMinutes()).isEqualTo(840);
+        assertThat(result.overrunMinutes()).isZero();
+        assertThat(result.dailyWorkBreakdown()).hasSize(2)
+                .extracting(PayrollCalculator.DailyWorkBreakdown::operationalWeek)
+                .containsExactly(1,2);
     }
 
     @Test
@@ -103,8 +119,12 @@ class PayrollCalculatorTest {
     }
     private TripEntity trip(DayOfWeek departureDay,String departureTime,DayOfWeek arrivalDay,String arrivalTime,
                             TripPaymentCategory category,String distance,Integer breakMinutes) {
+        return trip(1,departureDay,departureTime,arrivalDay,arrivalTime,category,distance,breakMinutes);
+    }
+    private TripEntity trip(int operationalWeek,DayOfWeek departureDay,String departureTime,DayOfWeek arrivalDay,String arrivalTime,
+                            TripPaymentCategory category,String distance,Integer breakMinutes) {
         Instant now=Instant.parse("2026-08-26T12:00:00Z");
-        return new TripEntity(UUID.randomUUID(),UUID.randomUUID(),1,departureDay,LocalTime.parse(departureTime),arrivalDay,
+        return new TripEntity(UUID.randomUUID(),UUID.randomUUID(),operationalWeek,departureDay,LocalTime.parse(departureTime),arrivalDay,
                 LocalTime.parse(arrivalTime),"Origin","Employer","Destination","Customer","Cargo",
                 category == TripPaymentCategory.DEADHEAD ? TripType.DEADHEAD : TripType.LOADED, category,
                 new BigDecimal(distance),breakMinutes,null,null,null,null,TripSource.MANUAL,"{}","{}",now,now);
