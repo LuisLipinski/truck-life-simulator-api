@@ -270,6 +270,14 @@ class TripApiIntegrationTest {
                 .expectBody()
                 .jsonPath("$.code").isEqualTo("CAREER_NOT_FOUND");
 
+        restTestClient.get()
+                .uri(CAREERS_PATH + "/" + career.id() + "/trips/draft?game=ATS")
+                .headers(headers -> headers.setBearerAuth(intruderToken))
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("CAREER_NOT_FOUND");
+
         assertThat(tripRepository.count()).isEqualTo(1);
     }
 
