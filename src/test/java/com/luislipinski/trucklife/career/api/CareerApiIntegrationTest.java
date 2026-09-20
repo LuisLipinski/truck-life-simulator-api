@@ -197,6 +197,16 @@ class CareerApiIntegrationTest {
                 .expectBody()
                 .jsonPath("$.code").isEqualTo("CAREER_NOT_FOUND");
 
+        restTestClient.patch()
+                .uri(CAREERS_PATH + "/" + secondCareer.id() + "/default-truck?game=ATS")
+                .headers(headers -> headers.setBearerAuth(firstToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("defaultTruckMake", "Volvo", "defaultTruckModel", "VNL 860"))
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("CAREER_NOT_FOUND");
+
         restTestClient.get()
                 .uri(CAREERS_PATH + "/" + secondCareer.id() + "?game=ATS")
                 .headers(headers -> headers.setBearerAuth(secondToken))
