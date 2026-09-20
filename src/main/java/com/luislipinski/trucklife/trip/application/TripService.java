@@ -8,9 +8,12 @@ import com.luislipinski.trucklife.shared.error.ResourceNotFoundException;
 import com.luislipinski.trucklife.trip.domain.TripPaymentCategory;
 import com.luislipinski.trucklife.trip.domain.TripSource;
 import com.luislipinski.trucklife.trip.domain.TripType;
+import com.luislipinski.trucklife.trip.persistence.TripDraftEntity;
+import com.luislipinski.trucklife.trip.persistence.TripDraftRepository;
 import com.luislipinski.trucklife.trip.persistence.TripEntity;
 import com.luislipinski.trucklife.trip.persistence.TripRepository;
 import java.math.BigDecimal;
+import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.DayOfWeek;
 import java.time.Instant;
@@ -24,20 +27,26 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.JacksonException;
+import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
 
 @Service
 public class TripService implements TripOperations {
 
+    private static final int MAX_DRAFT_JSON_LENGTH = 32768;
+    private static final TypeReference<Map<String, Object>> DRAFT_MAP_TYPE = new TypeReference<>() {};
+
     private final CareerRepository careerRepository;
     private final TripRepository tripRepository;
+    private final TripDraftRepository tripDraftRepository;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
     public TripService(CareerRepository careerRepository, TripRepository tripRepository,
-                       ObjectMapper objectMapper, Clock clock) {
+                       TripDraftRepository tripDraftRepository, ObjectMapper objectMapper, Clock clock) {
         this.careerRepository = careerRepository;
         this.tripRepository = tripRepository;
+        this.tripDraftRepository = tripDraftRepository;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -75,7 +84,41 @@ public class TripService implements TripOperations {
                 TripSource.MANUAL, json(Map.of("companyName", textOrEmpty(career.getCompanyName()))),
                 json(baseSnapshot(career)), now, now
         );
-        return tripRepository.saveAndFlush(trip);
+        TripEntity saved = tripRepository.saveAndFlush(trip);
+        tripDraftRepository.deleteById(career.getId());
+        tripDraftRepository.flush();
+        return saved;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Draft getDraft(UUID userId, CareerGame game, UUID careerId) {
+        CareerEntity career = ownedCareer(userId, game, careerId);
+        return tripDraftRepository.findById(career.getId())
+                .filter(draft -> draft.getOperationalWeek() == career.getCurrentOperationalWeek())
+                .map(this::draft)
+                .orElseGet(() -> new Draft(career.getCurrentOperationalWeek(), Map.of(), null));
+    }
+
+    @Override
+    @Transactional
+    public Draft saveDraft(UUID userId, CareerGame game, UUID careerId, SaveTripDraftCommand command) {
+        CareerEntity career = lockedOwnedCareer(userId, game, careerId);
+        if (command.expectedOperationalWeek() != career.getCurrentOperationalWeek()) {
+            throw conflict(
+                    "TRIP_DRAFT_WEEK_STALE",
+                    "Trip draft week is stale",
+                    "Reload the career before saving a draft for a different operational week"
+            );
+        }
+
+        String payload = draftJson(command.data());
+        Instant now = clock.instant();
+        TripDraftEntity entity = tripDraftRepository.findById(career.getId())
+                .orElseGet(() -> new TripDraftEntity(career.getId(), career.getCurrentOperationalWeek(), payload, now));
+        entity.update(career.getCurrentOperationalWeek(), payload, now);
+        TripDraftEntity saved = tripDraftRepository.saveAndFlush(entity);
+        return draft(saved);
     }
 
     @Override
@@ -209,6 +252,27 @@ public class TripService implements TripOperations {
     private String json(Map<String, Object> value) {
         try { return objectMapper.writeValueAsString(value); }
         catch (JacksonException exception) { throw new IllegalStateException("Trip snapshot could not be serialized", exception); }
+    }
+
+    private String draftJson(Map<String, Object> value) {
+        Map<String, Object> data = value == null ? Map.of() : value;
+        String payload = json(data);
+        if (payload.length() > MAX_DRAFT_JSON_LENGTH) {
+            throw problem("TRIP_DRAFT_INVALID", "Trip draft invalid", "Trip draft is too large");
+        }
+        return payload;
+    }
+
+    private Draft draft(TripDraftEntity entity) {
+        try {
+            Map<String, Object> data = objectMapper.readValue(
+                    entity.getPayloadJson().getBytes(StandardCharsets.UTF_8),
+                    DRAFT_MAP_TYPE
+            );
+            return new Draft(entity.getOperationalWeek(), data, entity.getUpdatedAt());
+        } catch (JacksonException exception) {
+            throw new IllegalStateException("Trip draft could not be deserialized", exception);
+        }
     }
 
     private String required(String value, String field) {

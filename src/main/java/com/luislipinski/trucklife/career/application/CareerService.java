@@ -152,6 +152,36 @@ public class CareerService implements CareerOperations {
 
     @Override
     @Transactional
+    public CareerEntity updateDefaultTruck(
+            UUID userId,
+            CareerGame game,
+            UUID careerId,
+            String defaultTruckMake,
+            String defaultTruckModel
+    ) {
+        CareerEntity career = lockedOwnedCareer(userId, game, careerId);
+        String truckMake = optional(defaultTruckMake);
+        String truckModel = optional(defaultTruckModel);
+        if ((truckMake == null) != (truckModel == null)) {
+            throw new ApiProblemException(
+                    HttpStatus.BAD_REQUEST,
+                    "CAREER_DEFAULT_TRUCK_INVALID",
+                    "Default truck invalid",
+                    "defaultTruckMake and defaultTruckModel must be provided together"
+            );
+        }
+        if (Objects.equals(career.getDefaultTruckMake(), truckMake)
+                && Objects.equals(career.getDefaultTruckModel(), truckModel)) {
+            return career;
+        }
+
+        career.updateDefaultTruck(truckMake, truckModel, clock.instant());
+        flushCareer();
+        return career;
+    }
+
+    @Override
+    @Transactional
     public CareerEntity changeEmployer(
             UUID userId,
             CareerGame game,
@@ -261,6 +291,14 @@ public class CareerService implements CareerOperations {
 
     private CareerEntity ownedCareer(UUID userId, CareerGame game, UUID careerId) {
         return careerRepository.findByIdAndUserIdAndGame(careerId, userId, game)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "CAREER_NOT_FOUND",
+                        "The requested career does not exist"
+                ));
+    }
+
+    private CareerEntity lockedOwnedCareer(UUID userId, CareerGame game, UUID careerId) {
+        return careerRepository.findForUpdateByIdAndUserIdAndGame(careerId, userId, game)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "CAREER_NOT_FOUND",
                         "The requested career does not exist"

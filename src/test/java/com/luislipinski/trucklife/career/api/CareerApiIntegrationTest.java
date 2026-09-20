@@ -197,6 +197,16 @@ class CareerApiIntegrationTest {
                 .expectBody()
                 .jsonPath("$.code").isEqualTo("CAREER_NOT_FOUND");
 
+        restTestClient.patch()
+                .uri(CAREERS_PATH + "/" + secondCareer.id() + "/default-truck?game=ATS")
+                .headers(headers -> headers.setBearerAuth(firstToken))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("defaultTruckMake", "Volvo", "defaultTruckModel", "VNL 860"))
+                .exchange()
+                .expectStatus().isNotFound()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("CAREER_NOT_FOUND");
+
         restTestClient.get()
                 .uri(CAREERS_PATH + "/" + secondCareer.id() + "?game=ATS")
                 .headers(headers -> headers.setBearerAuth(secondToken))
@@ -310,6 +320,59 @@ class CareerApiIntegrationTest {
     }
 
     @Test
+    void updatesAndClearsTheDefaultTruckWithoutChangingTheScreenContract() {
+        UserEntity owner = saveUser("default-truck-owner@example.com");
+        String token = accessToken(owner);
+        CareerResponse created = create(token, createRequest(CareerGame.ATS, "Truck Preference Driver"));
+
+        CareerResponse updated = Objects.requireNonNull(restTestClient.patch()
+                .uri(CAREERS_PATH + "/" + created.id() + "/default-truck?game=ATS")
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(
+                        "defaultTruckMake", "Volvo",
+                        "defaultTruckModel", "VNL 860"
+                ))
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(HttpHeaders.CACHE_CONTROL, "no-store")
+                .expectBody(CareerResponse.class)
+                .returnResult()
+                .getResponseBody());
+
+        assertThat(updated.defaultTruckMake()).isEqualTo("Volvo");
+        assertThat(updated.defaultTruckModel()).isEqualTo("VNL 860");
+        assertThat(updated.version()).isEqualTo(created.version() + 1);
+
+        restTestClient.patch()
+                .uri(CAREERS_PATH + "/" + created.id() + "/default-truck?game=ATS")
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("defaultTruckMake", "Only Make"))
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("CAREER_DEFAULT_TRUCK_INVALID");
+
+        CareerResponse cleared = Objects.requireNonNull(restTestClient.patch()
+                .uri(CAREERS_PATH + "/" + created.id() + "/default-truck?game=ATS")
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of(
+                        "defaultTruckMake", "",
+                        "defaultTruckModel", ""
+                ))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody(CareerResponse.class)
+                .returnResult()
+                .getResponseBody());
+
+        assertThat(cleared.defaultTruckMake()).isNull();
+        assertThat(cleared.defaultTruckModel()).isNull();
+    }
+
+    @Test
     void validatesCreationAndProfileContractsBeforePersistence() {
         UserEntity owner = saveUser("validation-owner@example.com");
         String token = accessToken(owner);
@@ -362,6 +425,7 @@ class CareerApiIntegrationTest {
                 .jsonPath("$.paths['/api/v1/careers'].get.responses['200']").exists()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}'].get.responses['404']").exists()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}'].patch.responses['409']").exists()
+                .jsonPath("$.paths['/api/v1/careers/{careerId}/default-truck'].patch.responses['200']").exists()
                 .jsonPath("$.paths['/api/v1/careers'].post.security[0].bearerAuth").exists()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}'].patch.security[0].bearerAuth").exists();
 
