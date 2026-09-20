@@ -29,7 +29,9 @@ public interface FinancingOperations {
                  String jurisdictionCountryCode,String jurisdictionStateCode,String jurisdictionCity,String displayCurrency,
                  BigDecimal requestedAmount,BigDecimal principal,BigDecimal downPayment,BigDecimal annualInterestRate,
                  FinancialAmortizationMethod amortizationMethod,FinancialPaymentFrequency paymentFrequency,int termPeriods,
-                 BigDecimal installmentAmount,BigDecimal expectedTotalCost) {}
+                 BigDecimal installmentAmount,BigDecimal expectedTotalCost,String jurisdictionRuleSource,String jurisdictionRuleSummary,
+                 BigDecimal legalAprCap,String prepaymentRuleSummary,String latePaymentRuleSummary,BigDecimal prepaymentFeeRate,
+                 BigDecimal lateFeeRate,int maxMissedInstallments,BigDecimal downPaymentRate) {}
     record ContractDetails(FinancialContractEntity contract,List<FinancialInstallmentEntity> installments,
                            List<FinancialPaymentEntity> payments,List<FinancialContractEventEntity> events) {}
 }
