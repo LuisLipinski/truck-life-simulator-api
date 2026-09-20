@@ -21,6 +21,14 @@ public interface CareerOperations {
             UpdateCareerProfileCommand command
     );
 
+    CareerEntity updateDefaultTruck(
+            UUID userId,
+            CareerGame game,
+            UUID careerId,
+            String defaultTruckMake,
+            String defaultTruckModel
+    );
+
     CareerEntity changeEmployer(
             UUID userId,
             CareerGame game,
