@@ -87,6 +87,12 @@ public class CareerEntity {
         this.driverName=driverName; this.biography=biography; this.updatedAt=updatedAt;
     }
 
+    public void updateDefaultTruck(String defaultTruckMake, String defaultTruckModel, Instant updatedAt) {
+        this.defaultTruckMake=defaultTruckMake;
+        this.defaultTruckModel=defaultTruckModel;
+        this.updatedAt=updatedAt;
+    }
+
     public void changeEmployer(String companyName, Instant updatedAt) {
         this.companyName=companyName; this.updatedAt=updatedAt;
     }
