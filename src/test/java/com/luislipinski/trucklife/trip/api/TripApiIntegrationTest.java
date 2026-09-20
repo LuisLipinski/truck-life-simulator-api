@@ -11,6 +11,7 @@ import com.luislipinski.trucklife.identity.domain.UserRole;
 import com.luislipinski.trucklife.identity.domain.UserStatus;
 import com.luislipinski.trucklife.identity.persistence.UserEntity;
 import com.luislipinski.trucklife.identity.persistence.UserRepository;
+import com.luislipinski.trucklife.trip.persistence.TripDraftRepository;
 import com.luislipinski.trucklife.trip.persistence.TripRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -53,10 +54,12 @@ class TripApiIntegrationTest {
     @Autowired private CareerRepository careerRepository;
     @Autowired private CareerEventRepository eventRepository;
     @Autowired private TripRepository tripRepository;
+    @Autowired private TripDraftRepository tripDraftRepository;
     @Autowired private JwtAccessTokenIssuer accessTokenIssuer;
 
     @BeforeEach
     void cleanPersistence() {
+        tripDraftRepository.deleteAllInBatch();
         tripRepository.deleteAllInBatch();
         eventRepository.deleteAllInBatch();
         careerRepository.deleteAllInBatch();
@@ -104,6 +107,64 @@ class TripApiIntegrationTest {
                 .expectBody()
                 .jsonPath("$.id").isEqualTo(trip.id().toString())
                 .jsonPath("$.source").isEqualTo("MANUAL");
+    }
+
+    @Test
+    void savesLoadsAndClearsTheCurrentWeekDraftWhenTheTripIsCreated() {
+        UserEntity owner = saveUser("trip-draft-owner@example.com");
+        String token = accessToken(owner);
+        CareerResponse career = createCareer(token, CareerGame.ATS, "Draft Driver");
+
+        restTestClient.get()
+                .uri(CAREERS_PATH + "/" + career.id() + "/trips/draft?game=ATS")
+                .headers(headers -> headers.setBearerAuth(token))
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(HttpHeaders.CACHE_CONTROL, "no-store")
+                .expectBody()
+                .jsonPath("$.operationalWeek").isEqualTo(1)
+                .jsonPath("$.data").isEmpty();
+
+        Map<String, Object> draftData = new LinkedHashMap<>();
+        draftData.put("departureDay", "monday");
+        draftData.put("origin", "Phoenix, AZ");
+        draftData.put("distance", "120");
+        draftData.put("keepTruckSaved", true);
+
+        restTestClient.put()
+                .uri(CAREERS_PATH + "/" + career.id() + "/trips/draft?game=ATS")
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("expectedOperationalWeek", 1, "data", draftData))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.operationalWeek").isEqualTo(1)
+                .jsonPath("$.data.origin").isEqualTo("Phoenix, AZ")
+                .jsonPath("$.updatedAt").exists();
+
+        assertThat(tripDraftRepository.count()).isEqualTo(1);
+
+        restTestClient.put()
+                .uri(CAREERS_PATH + "/" + career.id() + "/trips/draft?game=ATS")
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(Map.of("expectedOperationalWeek", 2, "data", draftData))
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("TRIP_DRAFT_WEEK_STALE");
+
+        createTrip(token, career.id(), CareerGame.ATS, loadedTrip());
+
+        assertThat(tripDraftRepository.count()).isZero();
+        restTestClient.get()
+                .uri(CAREERS_PATH + "/" + career.id() + "/trips/draft?game=ATS")
+                .headers(headers -> headers.setBearerAuth(token))
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.data").isEmpty();
     }
 
     @Test
@@ -242,6 +303,8 @@ class TripApiIntegrationTest {
                 .expectBody()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/trips'].post.responses['201']").exists()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/trips'].get.responses['200']").exists()
+                .jsonPath("$.paths['/api/v1/careers/{careerId}/trips/draft'].get.responses['200']").exists()
+                .jsonPath("$.paths['/api/v1/careers/{careerId}/trips/draft'].put.responses['200']").exists()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/trips/{tripId}'].get.responses['200']").exists();
     }
 
