@@ -152,6 +152,37 @@ public class CareerController {
     }
 
     @PatchMapping(
+            path = "/{careerId}/default-truck",
+            consumes = MediaType.APPLICATION_JSON_VALUE,
+            produces = MediaType.APPLICATION_JSON_VALUE
+    )
+    @Operation(summary = "Update the default truck used to prefill future trips")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Default truck updated"),
+            @ApiResponse(responseCode = "400", description = "Default truck data is invalid"),
+            @ApiResponse(responseCode = "401", description = "Access token missing or invalid"),
+            @ApiResponse(responseCode = "404", description = "Career not found for this owner and game")
+    })
+    public ResponseEntity<CareerResponse> updateDefaultTruck(
+            @PathVariable("careerId") UUID careerId,
+            @RequestParam(name = "game") CareerGame game,
+            @Valid @RequestBody UpdateDefaultTruckRequest request,
+            HttpServletRequest servletRequest
+    ) {
+        AuthenticatedAccount account = authorizedAccount(servletRequest);
+        CareerResponse response = CareerResponse.from(careerOperations.updateDefaultTruck(
+                account.userId(),
+                game,
+                careerId,
+                request.defaultTruckMake(),
+                request.defaultTruckModel()
+        ));
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(response);
+    }
+
+    @PatchMapping(
             path = "/{careerId}/employer",
             consumes = MediaType.APPLICATION_JSON_VALUE,
             produces = MediaType.APPLICATION_JSON_VALUE
