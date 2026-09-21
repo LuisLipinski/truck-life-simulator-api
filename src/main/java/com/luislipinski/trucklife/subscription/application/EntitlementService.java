@@ -59,7 +59,7 @@ public class EntitlementService implements EntitlementOperations {
         SubscriptionEntity latest = subscriptions.isEmpty() ? null : subscriptions.getFirst();
         SubscriptionStatus subscriptionStatus = valid != null
                 ? valid.getStatus()
-                : latest == null ? null : latest.getStatus();
+                : effectiveStatus(latest, now);
         Instant currentPeriodEnd = valid != null
                 ? valid.getCurrentPeriodEnd()
                 : latest == null ? null : latest.getCurrentPeriodEnd();
@@ -97,6 +97,18 @@ public class EntitlementService implements EntitlementOperations {
                         Map.copyOf(featureMap(plan.getId()))
                 ))
                 .toList();
+    }
+
+    private SubscriptionStatus effectiveStatus(SubscriptionEntity subscription, Instant now) {
+        if (subscription == null) {
+            return null;
+        }
+        if (subscription.getStatus() == SubscriptionStatus.ACTIVE
+                && subscription.getCurrentPeriodEnd() != null
+                && !subscription.getCurrentPeriodEnd().isAfter(now)) {
+            return SubscriptionStatus.EXPIRED;
+        }
+        return subscription.getStatus();
     }
 
     private boolean isCurrent(SubscriptionEntity subscription, Instant now) {
