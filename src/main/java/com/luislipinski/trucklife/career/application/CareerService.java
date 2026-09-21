@@ -10,7 +10,6 @@ import com.luislipinski.trucklife.career.persistence.CareerRepository;
 import com.luislipinski.trucklife.shared.error.ApiProblemException;
 import com.luislipinski.trucklife.shared.error.ResourceNotFoundException;
 import com.luislipinski.trucklife.subscription.application.EntitlementOperations;
-import com.luislipinski.trucklife.subscription.domain.PlanFeatureCode;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -67,10 +66,7 @@ public class CareerService implements CareerOperations {
         }
 
         ownerLock.lock(userId);
-        PlanFeatureCode limitFeature = command.game() == CareerGame.ATS
-                ? PlanFeatureCode.MAX_ATS_CAREERS
-                : PlanFeatureCode.MAX_ETS2_CAREERS;
-        EntitlementOperations.FeatureAccess access = entitlements.entitlements(userId).feature(limitFeature);
+        EntitlementOperations.FeatureAccess access = entitlements.careerLimit(userId, command.game());
         Integer careerLimit = access.enabled() ? access.limit() : 0;
         long currentCareers = careerRepository.countByUserIdAndGame(userId, command.game());
         if (careerLimit != null && currentCareers >= careerLimit) {
