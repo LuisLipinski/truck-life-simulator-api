@@ -147,7 +147,7 @@ class EntitlementsApiIntegrationTest {
                 UUID.randomUUID(),
                 user.getId(),
                 premiumPlan.getId(),
-                SubscriptionStatus.EXPIRED,
+                SubscriptionStatus.ACTIVE,
                 now.minus(31, ChronoUnit.DAYS),
                 now.minus(31, ChronoUnit.DAYS),
                 now.minus(1, ChronoUnit.DAYS),
