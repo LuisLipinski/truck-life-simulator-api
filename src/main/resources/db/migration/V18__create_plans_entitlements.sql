@@ -4,7 +4,7 @@ CREATE TABLE plans (
     name VARCHAR(80) NOT NULL,
     active BOOLEAN NOT NULL,
     price_cents INTEGER,
-    currency CHAR(3) NOT NULL DEFAULT 'BRL',
+    currency VARCHAR(3) NOT NULL DEFAULT 'BRL',
     billing_period VARCHAR(30),
     created_at TIMESTAMP WITH TIME ZONE NOT NULL,
     CONSTRAINT chk_plans_code CHECK (code IN ('FREE','PREMIUM')),
