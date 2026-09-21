@@ -17,15 +17,12 @@ import com.luislipinski.trucklife.career.persistence.CareerRepository;
 import com.luislipinski.trucklife.shared.error.ApiProblemException;
 import com.luislipinski.trucklife.shared.error.ResourceNotFoundException;
 import com.luislipinski.trucklife.subscription.application.EntitlementOperations;
-import com.luislipinski.trucklife.subscription.domain.PlanCode;
-import com.luislipinski.trucklife.subscription.domain.PlanFeatureCode;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -49,7 +46,7 @@ class CareerServiceTest {
         ownerLock = mock(CareerOwnerLock.class);
         eventRepository = mock(CareerEventRepository.class);
         entitlements = mock(EntitlementOperations.class);
-        when(entitlements.entitlements(any())).thenReturn(snapshot(2, 2, false));
+        when(entitlements.careerLimit(any(), any())).thenReturn(new EntitlementOperations.FeatureAccess(true, 2));
         service = new CareerService(
                 careerRepository,
                 ownerLock,
@@ -133,7 +130,8 @@ class CareerServiceTest {
     @Test
     void premiumCanCreateBeyondTheFreeLimit() {
         UUID userId = UUID.randomUUID();
-        when(entitlements.entitlements(userId)).thenReturn(snapshot(null, null, true));
+        when(entitlements.careerLimit(userId, CareerGame.ATS))
+                .thenReturn(new EntitlementOperations.FeatureAccess(true, null));
         when(careerRepository.countByUserIdAndGame(userId, CareerGame.ATS)).thenReturn(5L);
         when(careerRepository.saveAndFlush(any(CareerEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
 
@@ -226,19 +224,6 @@ class CareerServiceTest {
                         new UpdateCareerProfileCommand(0, "Concurrent Driver", null)
                 ),
                 "CAREER_VERSION_CONFLICT"
-        );
-    }
-
-    private EntitlementOperations.EntitlementSnapshot snapshot(Integer atsLimit, Integer ets2Limit, boolean premium) {
-        return new EntitlementOperations.EntitlementSnapshot(
-                premium ? PlanCode.PREMIUM : PlanCode.FREE,
-                premium,
-                null,
-                null,
-                Map.of(
-                        PlanFeatureCode.MAX_ATS_CAREERS, new EntitlementOperations.FeatureAccess(true, atsLimit),
-                        PlanFeatureCode.MAX_ETS2_CAREERS, new EntitlementOperations.FeatureAccess(true, ets2Limit)
-                )
         );
     }
 
