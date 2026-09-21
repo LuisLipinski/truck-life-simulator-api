@@ -9,6 +9,8 @@ import com.luislipinski.trucklife.career.persistence.CareerOwnerLock;
 import com.luislipinski.trucklife.career.persistence.CareerRepository;
 import com.luislipinski.trucklife.shared.error.ApiProblemException;
 import com.luislipinski.trucklife.shared.error.ResourceNotFoundException;
+import com.luislipinski.trucklife.subscription.application.EntitlementOperations;
+import com.luislipinski.trucklife.subscription.domain.PlanFeatureCode;
 import java.math.BigDecimal;
 import java.time.Clock;
 import java.time.DayOfWeek;
@@ -30,11 +32,10 @@ import tools.jackson.databind.ObjectMapper;
 @Service
 public class CareerService implements CareerOperations {
 
-    private static final long FREE_CAREERS_PER_GAME = 2;
-
     private final CareerRepository careerRepository;
     private final CareerOwnerLock ownerLock;
     private final CareerEventRepository eventRepository;
+    private final EntitlementOperations entitlements;
     private final ObjectMapper objectMapper;
     private final Clock clock;
 
@@ -42,12 +43,14 @@ public class CareerService implements CareerOperations {
             CareerRepository careerRepository,
             CareerOwnerLock ownerLock,
             CareerEventRepository eventRepository,
+            EntitlementOperations entitlements,
             ObjectMapper objectMapper,
             Clock clock
     ) {
         this.careerRepository = careerRepository;
         this.ownerLock = ownerLock;
         this.eventRepository = eventRepository;
+        this.entitlements = entitlements;
         this.objectMapper = objectMapper;
         this.clock = clock;
     }
@@ -64,12 +67,18 @@ public class CareerService implements CareerOperations {
         }
 
         ownerLock.lock(userId);
-        if (careerRepository.countByUserIdAndGame(userId, command.game()) >= FREE_CAREERS_PER_GAME) {
+        PlanFeatureCode limitFeature = command.game() == CareerGame.ATS
+                ? PlanFeatureCode.MAX_ATS_CAREERS
+                : PlanFeatureCode.MAX_ETS2_CAREERS;
+        EntitlementOperations.FeatureAccess access = entitlements.entitlements(userId).feature(limitFeature);
+        Integer careerLimit = access.enabled() ? access.limit() : 0;
+        long currentCareers = careerRepository.countByUserIdAndGame(userId, command.game());
+        if (careerLimit != null && currentCareers >= careerLimit) {
             throw new ApiProblemException(
                     HttpStatus.CONFLICT,
                     "CAREER_LIMIT_REACHED",
                     "Career limit reached",
-                    "The Free account limit is two careers per game"
+                    "The current plan allows at most " + careerLimit + " careers for " + command.game()
             );
         }
 
