@@ -11,6 +11,8 @@ import com.luislipinski.trucklife.career.persistence.CareerEntity;
 import com.luislipinski.trucklife.career.persistence.CareerOwnerLock;
 import com.luislipinski.trucklife.career.persistence.CareerRepository;
 import com.luislipinski.trucklife.shared.error.ApiProblemException;
+import com.luislipinski.trucklife.subscription.application.EntitlementOperations;
+import com.luislipinski.trucklife.subscription.domain.PlanFeatureCode;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -41,6 +43,7 @@ public class CareerImportService {
     private final CareerImportOperationRepository importRepository;
     private final CareerRepository careerRepository;
     private final CareerOwnerLock ownerLock;
+    private final EntitlementOperations entitlements;
     private final CareerImportAggregateMaterializer aggregateMaterializer;
     private final ObjectMapper objectMapper;
     private final Clock clock;
@@ -50,6 +53,7 @@ public class CareerImportService {
             CareerImportOperationRepository importRepository,
             CareerRepository careerRepository,
             CareerOwnerLock ownerLock,
+            EntitlementOperations entitlements,
             CareerImportAggregateMaterializer aggregateMaterializer,
             ObjectMapper objectMapper,
             Clock clock
@@ -58,6 +62,7 @@ public class CareerImportService {
         this.importRepository = importRepository;
         this.careerRepository = careerRepository;
         this.ownerLock = ownerLock;
+        this.entitlements = entitlements;
         this.aggregateMaterializer = aggregateMaterializer;
         this.objectMapper = objectMapper;
         this.clock = clock;
@@ -96,6 +101,8 @@ public class CareerImportService {
                     "This local career is already associated with another import operation"
             );
         }
+
+        enforceCareerLimit(userId, request.game());
 
         Instant now = clock.instant();
         CareerImportOperationEntity operation = new CareerImportOperationEntity(
@@ -424,6 +431,22 @@ public class CareerImportService {
             }
         }
         return null;
+    }
+
+    private void enforceCareerLimit(UUID userId, CareerGame game) {
+        PlanFeatureCode limitFeature = game == CareerGame.ATS
+                ? PlanFeatureCode.MAX_ATS_CAREERS
+                : PlanFeatureCode.MAX_ETS2_CAREERS;
+        EntitlementOperations.FeatureAccess access = entitlements.feature(userId, limitFeature);
+        Integer limit = access.enabled() ? access.limit() : Integer.valueOf(0);
+        long currentCareers = careerRepository.countByUserIdAndGame(userId, game);
+        if (limit != null && currentCareers >= limit) {
+            throw conflict(
+                    "CAREER_LIMIT_REACHED",
+                    "Career limit reached",
+                    "The current plan allows at most " + limit + " careers for " + game
+            );
+        }
     }
 
     private ApiProblemException invalid(String detail) {

@@ -218,6 +218,54 @@ class CareerImportOrchestrationIntegrationTest {
     }
 
     @Test
+    void enforcesFreeCareerLimitOnNewImportsButKeepsCompletedReplayAvailable() {
+        UserEntity owner = saveUser("p5-import-limit@example.com");
+        String token = accessToken(owner);
+        CareerImportValidationRequest first = freshAtsRequest(UUID.randomUUID(), "career_limit_1");
+        CareerImportValidationRequest second = freshAtsRequest(UUID.randomUUID(), "career_limit_2");
+        CareerImportValidationRequest third = freshAtsRequest(UUID.randomUUID(), "career_limit_3");
+
+        restTestClient.post()
+                .uri(IMPORT_PATH)
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(first)
+                .exchange()
+                .expectStatus().isCreated();
+
+        restTestClient.post()
+                .uri(IMPORT_PATH)
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(second)
+                .exchange()
+                .expectStatus().isCreated();
+
+        restTestClient.post()
+                .uri(IMPORT_PATH)
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(third)
+                .exchange()
+                .expectStatus().isEqualTo(409)
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("CAREER_LIMIT_REACHED");
+
+        restTestClient.post()
+                .uri(IMPORT_PATH)
+                .headers(headers -> headers.setBearerAuth(token))
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(first)
+                .exchange()
+                .expectStatus().isOk()
+                .expectBody()
+                .jsonPath("$.idempotentReplay").isEqualTo(true);
+
+        assertThat(careerRepository.countByUserIdAndGame(owner.getId(), CareerGame.ATS)).isEqualTo(2);
+        assertThat(importRepository.count()).isEqualTo(2);
+    }
+
+    @Test
     void scopesSameLocalCareerIdentityToDifferentOwners() {
         UserEntity first = saveUser("p4-orchestration-first@example.com");
         UserEntity second = saveUser("p4-orchestration-second@example.com");
