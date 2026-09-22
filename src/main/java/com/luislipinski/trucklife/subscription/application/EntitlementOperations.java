@@ -1,6 +1,5 @@
 package com.luislipinski.trucklife.subscription.application;
 
-import com.luislipinski.trucklife.career.domain.CareerGame;
 import com.luislipinski.trucklife.subscription.domain.PlanCode;
 import com.luislipinski.trucklife.subscription.domain.PlanFeatureCode;
 import com.luislipinski.trucklife.subscription.domain.SubscriptionStatus;
@@ -11,7 +10,7 @@ import java.util.UUID;
 
 public interface EntitlementOperations {
     EntitlementSnapshot entitlements(UUID userId);
-    FeatureAccess careerLimit(UUID userId, CareerGame game);
+    FeatureAccess feature(UUID userId, PlanFeatureCode featureCode);
     List<PlanSnapshot> plans();
 
     record FeatureAccess(boolean enabled, Integer limit) {}
