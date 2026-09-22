@@ -12,6 +12,7 @@ import java.time.Instant;
 import java.util.UUID;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
+import tools.jackson.databind.JsonNode;
 
 @Entity
 @Table(name = "payment_events")
@@ -22,7 +23,7 @@ public class PaymentEventEntity {
     @Column(name = "provider_event_id", nullable = false, length = 160) private String providerEventId;
     @Column(name = "event_type", nullable = false, length = 80) private String eventType;
     @JdbcTypeCode(SqlTypes.JSON)
-    @Column(name = "payload_json", nullable = false, columnDefinition = "jsonb") private String payloadJson;
+    @Column(name = "payload_json", nullable = false, columnDefinition = "jsonb") private JsonNode payloadJson;
     @Column(name = "received_at", nullable = false) private Instant receivedAt;
     @Column(name = "processed_at") private Instant processedAt;
     @Enumerated(EnumType.STRING) @Column(name = "processing_status", nullable = false, length = 30) private PaymentEventStatus processingStatus;
@@ -36,7 +37,7 @@ public class PaymentEventEntity {
             PaymentProviderCode provider,
             String providerEventId,
             String eventType,
-            String payloadJson,
+            JsonNode payloadJson,
             Instant receivedAt
     ) {
         this.id = id;
@@ -54,7 +55,7 @@ public class PaymentEventEntity {
     public PaymentProviderCode getProvider() { return provider; }
     public String getProviderEventId() { return providerEventId; }
     public String getEventType() { return eventType; }
-    public String getPayloadJson() { return payloadJson; }
+    public JsonNode getPayloadJson() { return payloadJson; }
     public Instant getReceivedAt() { return receivedAt; }
     public Instant getProcessedAt() { return processedAt; }
     public PaymentEventStatus getProcessingStatus() { return processingStatus; }
