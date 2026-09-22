@@ -12,6 +12,7 @@ import com.luislipinski.trucklife.career.persistence.CareerOwnerLock;
 import com.luislipinski.trucklife.career.persistence.CareerRepository;
 import com.luislipinski.trucklife.shared.error.ApiProblemException;
 import com.luislipinski.trucklife.subscription.application.EntitlementOperations;
+import com.luislipinski.trucklife.subscription.domain.PlanFeatureCode;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -433,8 +434,11 @@ public class CareerImportService {
     }
 
     private void enforceCareerLimit(UUID userId, CareerGame game) {
-        EntitlementOperations.FeatureAccess access = entitlements.careerLimit(userId, game);
-        Integer limit = access.enabled() ? access.limit() : 0;
+        PlanFeatureCode limitFeature = game == CareerGame.ATS
+                ? PlanFeatureCode.MAX_ATS_CAREERS
+                : PlanFeatureCode.MAX_ETS2_CAREERS;
+        EntitlementOperations.FeatureAccess access = entitlements.feature(userId, limitFeature);
+        Integer limit = access.enabled() ? access.limit() : Integer.valueOf(0);
         long currentCareers = careerRepository.countByUserIdAndGame(userId, game);
         if (limit != null && currentCareers >= limit) {
             throw conflict(
