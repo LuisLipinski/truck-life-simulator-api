@@ -46,7 +46,7 @@ class CareerServiceTest {
         ownerLock = mock(CareerOwnerLock.class);
         eventRepository = mock(CareerEventRepository.class);
         entitlements = mock(EntitlementOperations.class);
-        when(entitlements.careerLimit(any(), any())).thenReturn(new EntitlementOperations.FeatureAccess(true, 2));
+        when(entitlements.feature(any(), any())).thenReturn(new EntitlementOperations.FeatureAccess(true, 2));
         service = new CareerService(
                 careerRepository,
                 ownerLock,
@@ -130,7 +130,7 @@ class CareerServiceTest {
     @Test
     void premiumCanCreateBeyondTheFreeLimit() {
         UUID userId = UUID.randomUUID();
-        when(entitlements.careerLimit(userId, CareerGame.ATS))
+        when(entitlements.feature(userId, com.luislipinski.trucklife.subscription.domain.PlanFeatureCode.MAX_ATS_CAREERS))
                 .thenReturn(new EntitlementOperations.FeatureAccess(true, null));
         when(careerRepository.countByUserIdAndGame(userId, CareerGame.ATS)).thenReturn(5L);
         when(careerRepository.saveAndFlush(any(CareerEntity.class))).thenAnswer(invocation -> invocation.getArgument(0));
