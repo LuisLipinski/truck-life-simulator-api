@@ -1,6 +1,5 @@
 package com.luislipinski.trucklife.subscription.application;
 
-import com.luislipinski.trucklife.career.domain.CareerGame;
 import com.luislipinski.trucklife.subscription.domain.PlanCode;
 import com.luislipinski.trucklife.subscription.domain.PlanFeatureCode;
 import com.luislipinski.trucklife.subscription.domain.SubscriptionStatus;
@@ -76,11 +75,8 @@ public class EntitlementService implements EntitlementOperations {
 
     @Override
     @Transactional(readOnly = true)
-    public FeatureAccess careerLimit(UUID userId, CareerGame game) {
-        PlanFeatureCode feature = game == CareerGame.ATS
-                ? PlanFeatureCode.MAX_ATS_CAREERS
-                : PlanFeatureCode.MAX_ETS2_CAREERS;
-        return entitlements(userId).feature(feature);
+    public FeatureAccess feature(UUID userId, PlanFeatureCode featureCode) {
+        return entitlements(userId).feature(featureCode);
     }
 
     @Override
