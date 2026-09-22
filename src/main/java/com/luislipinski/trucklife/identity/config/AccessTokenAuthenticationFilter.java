@@ -23,6 +23,10 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
     private static final String ME_PATH_PREFIX = ME_PATH + "/";
     private static final String CAREERS_PATH = "/api/v1/careers";
     private static final String CAREERS_PATH_PREFIX = CAREERS_PATH + "/";
+    private static final String SUBSCRIPTIONS_PATH = "/api/v1/subscriptions";
+    private static final String SUBSCRIPTIONS_PATH_PREFIX = SUBSCRIPTIONS_PATH + "/";
+    private static final String PAYMENTS_PATH = "/api/v1/payments";
+    private static final String PAYMENTS_PATH_PREFIX = PAYMENTS_PATH + "/";
     private static final String BEARER_PREFIX = "Bearer ";
 
     private final JwtAccessTokenIssuer accessTokenIssuer;
@@ -45,7 +49,11 @@ public class AccessTokenAuthenticationFilter extends OncePerRequestFilter {
         boolean protectedPath = ME_PATH.equals(requestUri)
                 || requestUri.startsWith(ME_PATH_PREFIX)
                 || CAREERS_PATH.equals(requestUri)
-                || requestUri.startsWith(CAREERS_PATH_PREFIX);
+                || requestUri.startsWith(CAREERS_PATH_PREFIX)
+                || SUBSCRIPTIONS_PATH.equals(requestUri)
+                || requestUri.startsWith(SUBSCRIPTIONS_PATH_PREFIX)
+                || PAYMENTS_PATH.equals(requestUri)
+                || requestUri.startsWith(PAYMENTS_PATH_PREFIX);
         return !protectedPath;
     }
 
