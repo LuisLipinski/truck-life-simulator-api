@@ -10,6 +10,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "payment_events")
@@ -19,6 +21,7 @@ public class PaymentEventEntity {
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 50) private PaymentProviderCode provider;
     @Column(name = "provider_event_id", nullable = false, length = 160) private String providerEventId;
     @Column(name = "event_type", nullable = false, length = 80) private String eventType;
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "payload_json", nullable = false, columnDefinition = "jsonb") private String payloadJson;
     @Column(name = "received_at", nullable = false) private Instant receivedAt;
     @Column(name = "processed_at") private Instant processedAt;
