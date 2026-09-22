@@ -121,6 +121,30 @@ class AccessTokenAuthenticationFilterTest {
     }
 
     @Test
+    void protectsSubscriptionCheckoutAndPaymentEndpoints() throws Exception {
+        for (String path : new String[]{
+                "/api/v1/subscriptions/checkout",
+                "/api/v1/payments/1a91469a-cd99-4e26-af96-7a7d891cf443"
+        }) {
+            MockHttpServletRequest request = new MockHttpServletRequest("GET", path);
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            FilterChain chain = mock(FilterChain.class);
+
+            filter.doFilter(request, response, chain);
+
+            verify(problemWriter).write(
+                    request,
+                    response,
+                    HttpStatus.UNAUTHORIZED,
+                    "AUTHENTICATION_REQUIRED",
+                    "Authentication required",
+                    "A Bearer access token is required"
+            );
+            verify(chain, never()).doFilter(request, response);
+        }
+    }
+
+    @Test
     void rejectsATokenWhenThePersistedRoleNoLongerMatches() throws Exception {
         UUID userId = UUID.randomUUID();
         UUID sessionId = UUID.randomUUID();
