@@ -298,6 +298,17 @@ class SessionLifecycleIntegrationTest {
                 .expectHeader().valueEquals(HttpHeaders.ACCESS_CONTROL_ALLOW_CREDENTIALS, "true");
 
         restTestClient.options()
+                .uri("/api/v1/careers/1a91469a-cd99-4e26-af96-7a7d891cf443/trips/draft?game=ATS")
+                .header(HttpHeaders.ORIGIN, ALLOWED_ORIGIN)
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "PUT")
+                .header(HttpHeaders.ACCESS_CONTROL_REQUEST_HEADERS, HttpHeaders.AUTHORIZATION + "," + HttpHeaders.CONTENT_TYPE)
+                .exchange()
+                .expectStatus().isOk()
+                .expectHeader().valueEquals(HttpHeaders.ACCESS_CONTROL_ALLOW_ORIGIN, ALLOWED_ORIGIN)
+                .expectHeader().value(HttpHeaders.ACCESS_CONTROL_ALLOW_METHODS, methods ->
+                        assertThat(methods).contains("PUT"));
+
+        restTestClient.options()
                 .uri(REFRESH_PATH)
                 .header(HttpHeaders.ORIGIN, "https://attacker.example")
                 .header(HttpHeaders.ACCESS_CONTROL_REQUEST_METHOD, "POST")
