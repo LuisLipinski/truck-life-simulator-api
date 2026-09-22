@@ -58,7 +58,7 @@ public class PaymentCheckoutService implements PaymentOperations {
     }
 
     @Override
-    public PaymentOrderEntity checkoutPremium(UUID userId, String payerEmail, UUID operationId) {
+    public CheckoutResult checkoutPremium(UUID userId, String payerEmail, UUID operationId) {
         PlanEntity premium = premiumPlan();
         int priceCents = configuredPrice(premium);
         requireProviderConfigured();
@@ -70,7 +70,7 @@ public class PaymentCheckoutService implements PaymentOperations {
             throw new IllegalStateException("Checkout transaction returned no result");
         }
         if (prepared.replay()) {
-            return prepared.order();
+            return new CheckoutResult(prepared.order(), true);
         }
 
         PaymentProvider.PixCheckout pix;
@@ -94,7 +94,7 @@ public class PaymentCheckoutService implements PaymentOperations {
             );
         }
 
-        return transactions.execute(status -> {
+        PaymentOrderEntity completed = transactions.execute(status -> {
             PaymentOrderEntity order = paymentOrderRepository
                     .findByIdAndUserId(prepared.order().getId(), userId)
                     .orElseThrow(() -> new IllegalStateException("Prepared payment order disappeared"));
@@ -110,6 +110,10 @@ public class PaymentCheckoutService implements PaymentOperations {
             );
             return paymentOrderRepository.saveAndFlush(order);
         });
+        if (completed == null) {
+            throw new IllegalStateException("Payment order update transaction returned no result");
+        }
+        return new CheckoutResult(completed, false);
     }
 
     @Override
@@ -131,7 +135,7 @@ public class PaymentCheckoutService implements PaymentOperations {
     @Override
     public SubscriptionEntity currentSubscription(UUID userId) {
         return subscriptionRepository
-                .findFirstByUserIdAndStatusInOrderByUpdatedAtDescIdDesc(userId, OPEN_SUBSCRIPTION_STATUSES)
+                .findFirstByUserIdOrderByUpdatedAtDescIdDesc(userId)
                 .orElse(null);
     }
 
