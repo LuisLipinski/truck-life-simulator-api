@@ -22,7 +22,7 @@ public class IdentityWebConfiguration {
     @Bean
     FilterRegistrationBean<CorsFilter> identityCorsFilter(IdentityWebProperties properties){
         CorsConfiguration configuration=new CorsConfiguration(); configuration.setAllowedOrigins(properties.allowedOrigins());
-        configuration.setAllowedMethods(List.of("GET","POST","PATCH","DELETE","OPTIONS"));
+        configuration.setAllowedMethods(List.of("GET","POST","PUT","PATCH","DELETE","OPTIONS"));
         configuration.setAllowedHeaders(List.of(HttpHeaders.CONTENT_TYPE,HttpHeaders.AUTHORIZATION,CsrfTokenService.HEADER_NAME,"X-Correlation-ID"));
         configuration.setExposedHeaders(List.of("X-Correlation-ID",HttpHeaders.RETRY_AFTER)); configuration.setAllowCredentials(true); configuration.setMaxAge(3600L);
         UrlBasedCorsConfigurationSource source=new UrlBasedCorsConfigurationSource(); source.registerCorsConfiguration("/**",configuration);
