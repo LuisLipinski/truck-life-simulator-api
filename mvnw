@@ -19,7 +19,7 @@
 # ----------------------------------------------------------------------------
 
 # ----------------------------------------------------------------------------
-# Apache Maven Wrapper startup script, version 3.3.4
+# Apache Maven Wrapper startup batch script, version 3.3.4
 #
 # Optional ENV vars
 # -----------------
@@ -32,7 +32,8 @@
 set -euf
 [ "${MVNW_VERBOSE-}" != debug ] || set -x
 
-native_path() { printf %s\n "$1"; }
+# OS specific support.
+native_path() { printf %s\\n "$1"; }
 case "$(uname)" in
 CYGWIN* | MINGW*)
   [ -z "${JAVA_HOME-}" ] || JAVA_HOME="$(cygpath --unix "$JAVA_HOME")"
@@ -40,9 +41,12 @@ CYGWIN* | MINGW*)
   ;;
 esac
 
+# set JAVACMD and JAVACCMD
 set_java_home() {
+  # For Cygwin and MinGW, ensure paths are in Unix format before anything is touched
   if [ -n "${JAVA_HOME-}" ]; then
     if [ -x "$JAVA_HOME/jre/sh/java" ]; then
+      # IBM's JDK on AIX uses strange locations for the executables
       JAVACMD="$JAVA_HOME/jre/sh/java"
       JAVACCMD="$JAVA_HOME/jre/sh/javac"
     else
@@ -74,6 +78,7 @@ set_java_home() {
   fi
 }
 
+# hash string like Java String::hashCode
 hash_string() {
   str="${1:-}" h=0
   while [ -n "$str" ]; do
@@ -81,24 +86,29 @@ hash_string() {
     h=$(((h * 31 + $(LC_CTYPE=C printf %d "'$char")) % 4294967296))
     str="${str#?}"
   done
-  printf %x\n $h
+  printf %x\\n $h
 }
 
 verbose() { :; }
-[ "${MVNW_VERBOSE-}" != true ] || verbose() { printf %s\n "${1-}"; }
+[ "${MVNW_VERBOSE-}" != true ] || verbose() { printf %s\\n "${1-}"; }
 
 die() {
-  printf %s\n "$1" >&2
+  printf %s\\n "$1" >&2
   exit 1
 }
 
 trim() {
+  # MWRAPPER-139:
+  #   Trims trailing and leading whitespace, carriage returns, tabs, and linefeeds.
+  #   Needed for removing poorly interpreted newline sequences when running in more
+  #   exotic environments such as mingw bash on Windows.
   printf "%s" "${1}" | tr -d '[:space:]'
 }
 
 scriptDir="$(dirname "$0")"
 scriptName="$(basename "$0")"
 
+# parse distributionUrl and optional distributionSha256Sum, requires .mvn/wrapper/maven-wrapper.properties
 while IFS="=" read -r key value; do
   case "${key-}" in
   distributionUrl) distributionUrl=$(trim "${value-}") ;;
@@ -126,6 +136,8 @@ maven-mvnd-*) MVN_CMD=mvnd.sh _MVNW_REPO_PATTERN=/maven/mvnd/ ;;
 *) MVN_CMD="mvn${scriptName#mvnw}" _MVNW_REPO_PATTERN=/org/apache/maven/ ;;
 esac
 
+# apply MVNW_REPOURL and calculate MAVEN_HOME
+# maven home pattern: ~/.m2/wrapper/dists/{apache-maven-<version>,maven-mvnd-<version>-<platform>}/<hash>
 [ -z "${MVNW_REPOURL-}" ] || distributionUrl="$MVNW_REPOURL$_MVNW_REPO_PATTERN${distributionUrl#*"$_MVNW_REPO_PATTERN"}"
 distributionUrlName="${distributionUrl##*/}"
 distributionUrlNameMain="${distributionUrlName%.*}"
@@ -148,6 +160,7 @@ case "${distributionUrl-}" in
 *) die "distributionUrl is not valid, must match *-bin.zip or maven-mvnd-*.zip, but found '${distributionUrl-}'" ;;
 esac
 
+# prepare tmp dir
 if TMP_DOWNLOAD_DIR="$(mktemp -d)" && [ -d "$TMP_DOWNLOAD_DIR" ]; then
   clean() { rm -rf -- "$TMP_DOWNLOAD_DIR"; }
   trap clean HUP INT TERM EXIT
@@ -156,18 +169,23 @@ else
 fi
 
 mkdir -p -- "${MAVEN_HOME%/*}"
+
+# Download and Install Apache Maven
 verbose "Couldn't find MAVEN_HOME, downloading and installing it ..."
 verbose "Downloading from: $distributionUrl"
 verbose "Downloading to: $TMP_DOWNLOAD_DIR/$distributionUrlName"
 
+# select .zip or .tar.gz
 if ! command -v unzip >/dev/null; then
   distributionUrl="${distributionUrl%.zip}.tar.gz"
   distributionUrlName="${distributionUrl##*/}"
 fi
 
+# verbose opt
 __MVNW_QUIET_WGET=--quiet __MVNW_QUIET_CURL=--silent __MVNW_QUIET_UNZIP=-q __MVNW_QUIET_TAR=''
 [ "${MVNW_VERBOSE-}" != true ] || __MVNW_QUIET_WGET='' __MVNW_QUIET_CURL='' __MVNW_QUIET_UNZIP='' __MVNW_QUIET_TAR=v
 
+# normalize http auth
 case "${MVNW_PASSWORD:+has-password}" in
 '') MVNW_USERNAME='' MVNW_PASSWORD='' ;;
 has-password) [ -n "${MVNW_USERNAME-}" ] || MVNW_USERNAME='' MVNW_PASSWORD='' ;;
@@ -197,12 +215,14 @@ elif set_java_home; then
 	  }
 	}
 	END
+  # For Cygwin/MinGW, switch paths to Windows format before running javac and java
   verbose " - Compiling Downloader.java ..."
   "$(native_path "$JAVACCMD")" "$(native_path "$javaSource")" || die "Failed to compile Downloader.java"
   verbose " - Running Downloader.java ..."
   "$(native_path "$JAVACMD")" -cp "$(native_path "$TMP_DOWNLOAD_DIR")" Downloader "$distributionUrl" "$(native_path "$targetZip")"
 fi
 
+# If specified, validate the SHA-256 sum of the Maven distribution zip file
 if [ -n "${distributionSha256Sum-}" ]; then
   distributionSha256Result=false
   if [ "$MVN_CMD" = mvnd.sh ]; then
@@ -229,20 +249,26 @@ if [ -n "${distributionSha256Sum-}" ]; then
   fi
 fi
 
+# unzip and move
 if command -v unzip >/dev/null; then
   unzip ${__MVNW_QUIET_UNZIP:+"$__MVNW_QUIET_UNZIP"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -d "$TMP_DOWNLOAD_DIR" || die "failed to unzip"
 else
   tar xzf${__MVNW_QUIET_TAR:+"$__MVNW_QUIET_TAR"} "$TMP_DOWNLOAD_DIR/$distributionUrlName" -C "$TMP_DOWNLOAD_DIR" || die "failed to untar"
 fi
 
+# Find the actual extracted directory name (handles snapshots where filename != directory name)
 actualDistributionDir=""
+
+# First try the expected directory name (for regular distributions)
 if [ -d "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain" ]; then
   if [ -f "$TMP_DOWNLOAD_DIR/$distributionUrlNameMain/bin/$MVN_CMD" ]; then
     actualDistributionDir="$distributionUrlNameMain"
   fi
 fi
 
+# If not found, search for any directory with the Maven executable (for snapshots)
 if [ -z "$actualDistributionDir" ]; then
+  # enable globbing to iterate over items
   set +f
   for dir in "$TMP_DOWNLOAD_DIR"/*; do
     if [ -d "$dir" ]; then
@@ -262,7 +288,7 @@ if [ -z "$actualDistributionDir" ]; then
 fi
 
 verbose "Found extracted Maven distribution directory: $actualDistributionDir"
-printf %s\n "$distributionUrl" >"$TMP_DOWNLOAD_DIR/$actualDistributionDir/mvnw.url"
+printf %s\\n "$distributionUrl" >"$TMP_DOWNLOAD_DIR/$actualDistributionDir/mvnw.url"
 mv -- "$TMP_DOWNLOAD_DIR/$actualDistributionDir" "$MAVEN_HOME" || [ -d "$MAVEN_HOME" ] || die "fail to move MAVEN_HOME"
 
 clean || :
