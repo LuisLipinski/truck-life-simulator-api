@@ -11,6 +11,7 @@ import java.util.Map;
 public record EntitlementsResponse(
         PlanCode plan,
         boolean premium,
+        boolean premiumRestrictionsEnabled,
         SubscriptionStatus subscriptionStatus,
         Instant currentPeriodEnd,
         Map<PlanFeatureCode, EntitlementFeatureResponse> features
@@ -21,6 +22,7 @@ public record EntitlementsResponse(
         return new EntitlementsResponse(
                 snapshot.plan(),
                 snapshot.premium(),
+                snapshot.premiumRestrictionsEnabled(),
                 snapshot.subscriptionStatus(),
                 snapshot.currentPeriodEnd(),
                 Map.copyOf(features)
