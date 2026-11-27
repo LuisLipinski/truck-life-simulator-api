@@ -18,6 +18,7 @@ public interface EntitlementOperations {
     record EntitlementSnapshot(
             PlanCode plan,
             boolean premium,
+            boolean premiumRestrictionsEnabled,
             SubscriptionStatus subscriptionStatus,
             Instant currentPeriodEnd,
             Map<PlanFeatureCode, FeatureAccess> features
@@ -34,6 +35,7 @@ public interface EntitlementOperations {
             Integer priceCents,
             String currency,
             String billingPeriod,
+            boolean premiumRestrictionsEnabled,
             Map<PlanFeatureCode, FeatureAccess> features
     ) {}
 }
