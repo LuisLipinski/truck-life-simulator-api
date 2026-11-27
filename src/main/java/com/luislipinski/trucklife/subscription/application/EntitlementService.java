@@ -23,17 +23,20 @@ public class EntitlementService implements EntitlementOperations {
     private final PlanRepository planRepository;
     private final PlanFeatureRepository featureRepository;
     private final SubscriptionRepository subscriptionRepository;
+    private final PremiumFeatureProperties premiumFeatures;
     private final Clock clock;
 
     public EntitlementService(
             PlanRepository planRepository,
             PlanFeatureRepository featureRepository,
             SubscriptionRepository subscriptionRepository,
+            PremiumFeatureProperties premiumFeatures,
             Clock clock
     ) {
         this.planRepository = planRepository;
         this.featureRepository = featureRepository;
         this.subscriptionRepository = subscriptionRepository;
+        this.premiumFeatures = premiumFeatures;
         this.clock = clock;
     }
 
@@ -63,10 +66,13 @@ public class EntitlementService implements EntitlementOperations {
                 ? valid.getCurrentPeriodEnd()
                 : latest == null ? null : latest.getCurrentPeriodEnd();
 
-        Map<PlanFeatureCode, FeatureAccess> features = featureMap(plan.getId());
+        Map<PlanFeatureCode, FeatureAccess> features = premiumFeatures.isRestrictionsEnabled()
+                ? featureMap(plan.getId())
+                : unrestrictedFeatureMap();
         return new EntitlementSnapshot(
                 plan.getCode(),
                 plan.getCode() == PlanCode.PREMIUM,
+                premiumFeatures.isRestrictionsEnabled(),
                 subscriptionStatus,
                 currentPeriodEnd,
                 Map.copyOf(features)
@@ -90,6 +96,7 @@ public class EntitlementService implements EntitlementOperations {
                         plan.getPriceCents(),
                         plan.getCurrency(),
                         plan.getBillingPeriod(),
+                        premiumFeatures.isRestrictionsEnabled(),
                         Map.copyOf(featureMap(plan.getId()))
                 ))
                 .toList();
@@ -117,6 +124,14 @@ public class EntitlementService implements EntitlementOperations {
     private PlanEntity freePlan() {
         return planRepository.findByCodeAndActiveTrue(PlanCode.FREE)
                 .orElseThrow(() -> new IllegalStateException("The active FREE plan seed is missing"));
+    }
+
+    private EnumMap<PlanFeatureCode, FeatureAccess> unrestrictedFeatureMap() {
+        EnumMap<PlanFeatureCode, FeatureAccess> result = new EnumMap<>(PlanFeatureCode.class);
+        for (PlanFeatureCode featureCode : PlanFeatureCode.values()) {
+            result.put(featureCode, new FeatureAccess(true, null));
+        }
+        return result;
     }
 
     private EnumMap<PlanFeatureCode, FeatureAccess> featureMap(UUID planId) {

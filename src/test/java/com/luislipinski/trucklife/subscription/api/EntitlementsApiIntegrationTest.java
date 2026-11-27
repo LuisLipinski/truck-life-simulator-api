@@ -39,7 +39,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
 import org.testcontainers.postgresql.PostgreSQLContainer;
 import org.testcontainers.utility.DockerImageName;
 
-@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "features.premium.restrictions-enabled=true")
 @AutoConfigureRestTestClient
 @ActiveProfiles("test")
 @Testcontainers
@@ -86,6 +86,8 @@ class EntitlementsApiIntegrationTest {
                 .filter(plan -> plan.code() == PlanCode.PREMIUM)
                 .findFirst().orElseThrow();
 
+        assertThat(free.premiumRestrictionsEnabled()).isTrue();
+        assertThat(premium.premiumRestrictionsEnabled()).isTrue();
         assertThat(free.priceCents()).isZero();
         assertThat(free.features().get(PlanFeatureCode.MAX_ATS_CAREERS).limit()).isEqualTo(2);
         assertThat(free.features().get(PlanFeatureCode.MAX_ETS2_CAREERS).limit()).isEqualTo(2);
@@ -102,6 +104,7 @@ class EntitlementsApiIntegrationTest {
         EntitlementsResponse free = entitlements(token);
         assertThat(free.plan()).isEqualTo(PlanCode.FREE);
         assertThat(free.premium()).isFalse();
+        assertThat(free.premiumRestrictionsEnabled()).isTrue();
         assertThat(free.features().get(PlanFeatureCode.MAX_ATS_CAREERS).limit()).isEqualTo(2);
         assertThat(free.features().get(PlanFeatureCode.MAX_ETS2_CAREERS).limit()).isEqualTo(2);
 

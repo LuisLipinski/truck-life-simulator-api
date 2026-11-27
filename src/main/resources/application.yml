@@ -35,6 +35,10 @@ management:
     env:
       enabled: true
 
+features:
+  premium:
+    restrictions-enabled: ${PREMIUM_RESTRICTIONS_ENABLED:false}
+
 springdoc:
   api-docs:
     path: /v3/api-docs

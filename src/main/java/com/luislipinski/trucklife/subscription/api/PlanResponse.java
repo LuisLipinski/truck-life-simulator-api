@@ -13,6 +13,7 @@ public record PlanResponse(
         Integer priceCents,
         String currency,
         String billingPeriod,
+        boolean premiumRestrictionsEnabled,
         Map<PlanFeatureCode, EntitlementFeatureResponse> features
 ) {
     static PlanResponse from(EntitlementOperations.PlanSnapshot plan) {
@@ -25,6 +26,7 @@ public record PlanResponse(
                 plan.priceCents(),
                 plan.currency(),
                 plan.billingPeriod(),
+                plan.premiumRestrictionsEnabled(),
                 Map.copyOf(features)
         );
     }
