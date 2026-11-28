@@ -96,6 +96,21 @@ public class FinancingJurisdictionCatalog {
             state("WA","0.29","0.27"), state("WY","0.31","0.23")
     );
 
+    public void validateVehiclePurchaseJurisdiction(CareerGame game, String countryCode, String stateCode) {
+        if (game == CareerGame.ATS) {
+            String state = normalize(stateCode);
+            if (!"US".equals(normalize(countryCode)) || !ATS_STATE_RULES.containsKey(state)) {
+                throw new IllegalArgumentException("No researched ATS vehicle financing jurisdiction is available for state " + state);
+            }
+            return;
+        }
+        String country = normalize(countryCode);
+        if (!ETS2_REFERENCES.containsKey(country)) {
+            throw new IllegalArgumentException("No researched ETS2 vehicle financing jurisdiction is available for country " + country);
+        }
+        countryRule(country, FinancialProductType.VEHICLE_FINANCING);
+    }
+
     public ResolvedPolicy resolve(CareerEntity career, FinancialProductType productType, BigDecimal requestedAmount) {
         return resolve(career, productType, requestedAmount, null, null);
     }
