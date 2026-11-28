@@ -1,11 +1,13 @@
 package com.luislipinski.trucklife.vehicle.api;
 
 import com.luislipinski.trucklife.career.domain.CareerGame;
+import com.luislipinski.trucklife.finance.api.FinancingOfferResponse;
 import com.luislipinski.trucklife.identity.application.AccountAuthorization;
 import com.luislipinski.trucklife.identity.application.AuthenticatedAccount;
 import com.luislipinski.trucklife.identity.config.AccessTokenAuthenticationFilter;
 import com.luislipinski.trucklife.identity.domain.UserRole;
 import com.luislipinski.trucklife.vehicle.application.VehicleOperations;
+import com.luislipinski.trucklife.vehicle.domain.VehicleCondition;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -13,6 +15,8 @@ import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMin;
+import java.math.BigDecimal;
 import java.net.URI;
 import java.util.List;
 import java.util.UUID;
@@ -53,6 +57,39 @@ public class VehicleController {
                 .body(operations.list(account.userId(), game, careerId).stream().map(VehicleResponse::from).toList());
     }
 
+    @GetMapping(path = "/financing-offers", produces = MediaType.APPLICATION_JSON_VALUE)
+    @Operation(summary = "Calculate truck financing offers using the purchase jurisdiction for new trucks and headquarters for used trucks")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Vehicle financing offers"),
+            @ApiResponse(responseCode = "400", description = "Invalid or unsupported purchase jurisdiction"),
+            @ApiResponse(responseCode = "401", description = "Authentication required"),
+            @ApiResponse(responseCode = "404", description = "Career not found")
+    })
+    public ResponseEntity<List<FinancingOfferResponse>> financingOffers(
+            @PathVariable UUID careerId,
+            @RequestParam CareerGame game,
+            @RequestParam VehicleCondition condition,
+            @RequestParam @DecimalMin("1.00") BigDecimal purchasePrice,
+            @RequestParam(required = false) String purchaseCountryCode,
+            @RequestParam(required = false) String purchaseStateCode,
+            HttpServletRequest request
+    ) {
+        AuthenticatedAccount account = account(request);
+        return ResponseEntity.ok()
+                .cacheControl(CacheControl.noStore())
+                .body(operations.financingOffers(
+                                account.userId(),
+                                game,
+                                careerId,
+                                condition,
+                                purchasePrice,
+                                purchaseCountryCode,
+                                purchaseStateCode
+                        ).stream()
+                        .map(FinancingOfferResponse::from)
+                        .toList());
+    }
+
     @PostMapping(path = "/acquisitions", consumes = MediaType.APPLICATION_JSON_VALUE, produces = MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary = "Acquire the first owned truck by cash purchase or server-authoritative financing")
     @ApiResponses({
@@ -77,6 +114,9 @@ public class VehicleController {
                 new VehicleOperations.AcquireVehicleCommand(
                         body.operationId(),
                         body.acquisitionType(),
+                        body.vehicleCondition(),
+                        body.purchaseCountryCode(),
+                        body.purchaseStateCode(),
                         body.make(),
                         body.model(),
                         body.modelYear(),

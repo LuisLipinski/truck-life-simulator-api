@@ -36,7 +36,7 @@ public record FinancingOfferResponse(
         int maxMissedInstallments,
         BigDecimal downPaymentRate
 ) {
-    static FinancingOfferResponse from(FinancingOperations.Offer offer) {
+    public static FinancingOfferResponse from(FinancingOperations.Offer offer) {
         return new FinancingOfferResponse(
                 offer.productType(),
                 offer.policyVersion(),

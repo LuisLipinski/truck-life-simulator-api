@@ -1,6 +1,7 @@
 package com.luislipinski.trucklife.vehicle.persistence;
 
 import com.luislipinski.trucklife.vehicle.domain.VehicleAcquisitionType;
+import com.luislipinski.trucklife.vehicle.domain.VehicleCondition;
 import com.luislipinski.trucklife.vehicle.domain.VehicleStatus;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -25,6 +26,9 @@ public class CareerVehicleEntity {
     @Column(name = "initial_odometer", nullable = false, precision = 16, scale = 3) private BigDecimal initialOdometer;
     @Column(name = "purchase_price", nullable = false, precision = 14, scale = 2) private BigDecimal purchasePrice;
     @Column(name = "display_currency", nullable = false, length = 3) private String displayCurrency;
+    @Enumerated(EnumType.STRING) @Column(name = "vehicle_condition", length = 12) private VehicleCondition vehicleCondition;
+    @Column(name = "purchase_country_code", length = 2) private String purchaseCountryCode;
+    @Column(name = "purchase_state_code", length = 2) private String purchaseStateCode;
     @Enumerated(EnumType.STRING) @Column(name = "acquisition_type", nullable = false, length = 20) private VehicleAcquisitionType acquisitionType;
     @Enumerated(EnumType.STRING) @Column(nullable = false, length = 20) private VehicleStatus status;
     @Column(name = "acquired_operational_week", nullable = false) private int acquiredOperationalWeek;
@@ -45,6 +49,9 @@ public class CareerVehicleEntity {
             BigDecimal initialOdometer,
             BigDecimal purchasePrice,
             String displayCurrency,
+            VehicleCondition vehicleCondition,
+            String purchaseCountryCode,
+            String purchaseStateCode,
             VehicleAcquisitionType acquisitionType,
             VehicleStatus status,
             int acquiredOperationalWeek,
@@ -61,6 +68,9 @@ public class CareerVehicleEntity {
         this.initialOdometer = initialOdometer;
         this.purchasePrice = purchasePrice;
         this.displayCurrency = displayCurrency;
+        this.vehicleCondition = vehicleCondition;
+        this.purchaseCountryCode = purchaseCountryCode;
+        this.purchaseStateCode = purchaseStateCode;
         this.acquisitionType = acquisitionType;
         this.status = status;
         this.acquiredOperationalWeek = acquiredOperationalWeek;
@@ -78,6 +88,9 @@ public class CareerVehicleEntity {
     public BigDecimal getInitialOdometer(){return initialOdometer;}
     public BigDecimal getPurchasePrice(){return purchasePrice;}
     public String getDisplayCurrency(){return displayCurrency;}
+    public VehicleCondition getVehicleCondition(){return vehicleCondition;}
+    public String getPurchaseCountryCode(){return purchaseCountryCode;}
+    public String getPurchaseStateCode(){return purchaseStateCode;}
     public VehicleAcquisitionType getAcquisitionType(){return acquisitionType;}
     public VehicleStatus getStatus(){return status;}
     public int getAcquiredOperationalWeek(){return acquiredOperationalWeek;}

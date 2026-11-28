@@ -44,7 +44,19 @@ public class FinancingController {
     @GetMapping(path="/offers",produces=MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary="Calculate server-authoritative financing offers using the career jurisdiction and versioned market policy")
     @ApiResponses({@ApiResponse(responseCode="200",description="Available offers with market source, jurisdiction rule, legal ceiling when applicable and operational terms"),@ApiResponse(responseCode="401",description="Authentication required"),@ApiResponse(responseCode="404",description="Career not found"),@ApiResponse(responseCode="409",description="No researched policy for the career jurisdiction")})
-    public ResponseEntity<List<FinancingOfferResponse>> offers(@PathVariable UUID careerId,@RequestParam CareerGame game,@RequestParam FinancialProductType productType,@RequestParam @DecimalMin("1.00") BigDecimal requestedAmount,HttpServletRequest request){AuthenticatedAccount a=account(request);List<FinancingOfferResponse> body=operations.offers(a.userId(),game,careerId,productType,requestedAmount).stream().map(FinancingOfferResponse::from).toList();return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);}
+    public ResponseEntity<List<FinancingOfferResponse>> offers(@PathVariable UUID careerId,@RequestParam CareerGame game,@RequestParam FinancialProductType productType,@RequestParam @DecimalMin("1.00") BigDecimal requestedAmount,HttpServletRequest request){
+        AuthenticatedAccount a=account(request);
+        if(productType==FinancialProductType.VEHICLE_FINANCING){
+            throw new ApiProblemException(
+                    HttpStatus.CONFLICT,
+                    "VEHICLE_PURCHASE_CONTEXT_REQUIRED",
+                    "Vehicle purchase context required",
+                    "Vehicle financing offers require truck condition and purchase jurisdiction through the vehicle financing-offers endpoint"
+            );
+        }
+        List<FinancingOfferResponse> body=operations.offers(a.userId(),game,careerId,productType,requestedAmount).stream().map(FinancingOfferResponse::from).toList();
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(body);
+    }
 
     @PostMapping(path="/contracts",consumes=MediaType.APPLICATION_JSON_VALUE,produces=MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary="Create an idempotent financing or personal-loan contract using server policy")

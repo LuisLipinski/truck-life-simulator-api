@@ -96,15 +96,41 @@ public class FinancingJurisdictionCatalog {
             state("WA","0.29","0.27"), state("WY","0.31","0.23")
     );
 
-    public ResolvedPolicy resolve(CareerEntity career, FinancialProductType productType, BigDecimal requestedAmount) {
-        if (career.getGame() == CareerGame.ATS) {
-            return resolveAts(career, productType, requestedAmount);
+    public void validateVehiclePurchaseJurisdiction(CareerGame game, String countryCode, String stateCode) {
+        if (game == CareerGame.ATS) {
+            String state = normalize(stateCode);
+            if (!"US".equals(normalize(countryCode)) || !ATS_STATE_RULES.containsKey(state)) {
+                throw new IllegalArgumentException("No researched ATS vehicle financing jurisdiction is available for state " + state);
+            }
+            return;
         }
-        return resolveEts2(career, productType);
+        String country = normalize(countryCode);
+        if (!ETS2_REFERENCES.containsKey(country)) {
+            throw new IllegalArgumentException("No researched ETS2 vehicle financing jurisdiction is available for country " + country);
+        }
+        countryRule(country, FinancialProductType.VEHICLE_FINANCING);
     }
 
-    private ResolvedPolicy resolveAts(CareerEntity career, FinancialProductType productType, BigDecimal requestedAmount) {
-        String stateCode = normalize(career.getStateCode());
+    public ResolvedPolicy resolve(CareerEntity career, FinancialProductType productType, BigDecimal requestedAmount) {
+        return resolve(career, productType, requestedAmount, null, null);
+    }
+
+    public ResolvedPolicy resolve(
+            CareerEntity career,
+            FinancialProductType productType,
+            BigDecimal requestedAmount,
+            String jurisdictionCountryCode,
+            String jurisdictionStateCode
+    ) {
+        if (career.getGame() == CareerGame.ATS) {
+            String stateCode = normalizeOrFallback(jurisdictionStateCode, career.getStateCode());
+            return resolveAts(stateCode, productType, requestedAmount);
+        }
+        String countryCode = normalizeOrFallback(jurisdictionCountryCode, career.getCountryCode());
+        return resolveEts2(countryCode, productType);
+    }
+
+    private ResolvedPolicy resolveAts(String stateCode, FinancialProductType productType, BigDecimal requestedAmount) {
         StateRule stateRule = ATS_STATE_RULES.get(stateCode);
         if (stateRule == null) {
             throw new IllegalArgumentException("No researched ATS financing rule is available for state " + stateCode);
@@ -148,8 +174,7 @@ public class FinancingJurisdictionCatalog {
         );
     }
 
-    private ResolvedPolicy resolveEts2(CareerEntity career, FinancialProductType productType) {
-        String country = normalize(career.getCountryCode());
+    private ResolvedPolicy resolveEts2(String country, FinancialProductType productType) {
         MarketReference reference = ETS2_REFERENCES.get(country);
         if (reference == null) {
             throw new IllegalArgumentException("No researched ETS2 financing reference is available for country " + country);
@@ -251,6 +276,11 @@ public class FinancingJurisdictionCatalog {
 
     private String normalize(String value) {
         return value == null ? "" : value.strip().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeOrFallback(String candidate, String fallback) {
+        String normalized = normalize(candidate);
+        return normalized.isBlank() ? normalize(fallback) : normalized;
     }
 
     private String percent(BigDecimal value) {

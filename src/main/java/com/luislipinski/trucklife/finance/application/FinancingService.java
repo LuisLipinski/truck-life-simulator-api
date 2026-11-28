@@ -54,12 +54,13 @@ public class FinancingService implements FinancingOperations,FinancingPayrollOpe
         this.policyCatalog=policyCatalog;this.ledgerWriter=ledgerWriter;this.objectMapper=objectMapper;this.clock=clock;}
 
     @Override @Transactional(readOnly=true)
-    public List<Offer> offers(UUID userId,CareerGame game,UUID careerId,FinancialProductType productType,BigDecimal requestedAmount){CareerEntity career=ownedCareer(userId,game,careerId);try{return policyCatalog.offers(career,productType,requestedAmount);}catch(IllegalArgumentException ex){throw policyUnavailable(ex);}}
+    public List<Offer> offers(UUID userId,CareerGame game,UUID careerId,FinancialProductType productType,BigDecimal requestedAmount,
+                              String jurisdictionCountryCode,String jurisdictionStateCode){CareerEntity career=ownedCareer(userId,game,careerId);try{return policyCatalog.offers(career,productType,requestedAmount,jurisdictionCountryCode,jurisdictionStateCode);}catch(IllegalArgumentException ex){throw policyUnavailable(ex);}}
 
     @Override @Transactional
     public ContractDetails create(UUID userId,CareerGame game,UUID careerId,CreateContractCommand command){CareerEntity career=lockedCareer(userId,game,careerId);
         FinancialContractEntity existing=contractRepository.findByOriginationOperationId(command.operationId()).orElse(null);if(existing!=null){if(!existing.getCareerId().equals(careerId))throw conflict("FINANCING_OPERATION_ID_CONFLICT","Operation identifier conflict","The supplied operationId already belongs to another career");return details(existing);}
-        validateContext(career,command.expectedOperationalWeek(),command.expectedPayrollMonth());BigDecimal before=validateExpectedBalance(career,command.expectedBalance());Offer offer;try{offer=policyCatalog.offer(career,command.productType(),command.requestedAmount(),command.termPeriods());}catch(IllegalArgumentException ex){throw policyUnavailable(ex);}
+        validateContext(career,command.expectedOperationalWeek(),command.expectedPayrollMonth());BigDecimal before=validateExpectedBalance(career,command.expectedBalance());Offer offer;try{offer=policyCatalog.offer(career,command.productType(),command.requestedAmount(),command.termPeriods(),command.jurisdictionCountryCode(),command.jurisdictionStateCode());}catch(IllegalArgumentException ex){throw policyUnavailable(ex);}
         ledgerWriter.ensureOpeningBalance(careerId,before,career.getDisplayCurrency(),game==CareerGame.ETS2?1:null,career.getCreatedAt());
         if(offer.productType()==FinancialProductType.VEHICLE_FINANCING&&before.compareTo(offer.downPayment())<0)throw conflict("FINANCING_DOWN_PAYMENT_INSUFFICIENT","Insufficient balance for down payment","The current career balance cannot cover the server-calculated down payment");
         Instant now=clock.instant();UUID contractId=UUID.randomUUID();FinancialContractEntity contract=new FinancialContractEntity(contractId,careerId,command.operationId(),offer.productType(),
