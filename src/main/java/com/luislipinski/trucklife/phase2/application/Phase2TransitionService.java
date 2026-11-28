@@ -75,6 +75,7 @@ public class Phase2TransitionService implements Phase2TransitionOperations {
     public Details getOrCreate(UUID userId, CareerGame game, UUID careerId) {
         CareerEntity career = lockedCareer(userId, game, careerId);
         Phase2TransitionEntity transition = ensureTransition(career);
+        refreshPendingSettlement(career, transition);
         CarrierContractEntity contract = carrierContractRepository.findByTransitionId(transition.getId()).orElse(null);
         return new Details(transition, contract, money(career.getBalance()), false);
     }
@@ -98,6 +99,7 @@ public class Phase2TransitionService implements Phase2TransitionOperations {
 
         CareerEntity career = lockedCareer(userId, game, careerId);
         Phase2TransitionEntity transition = ensureTransition(career);
+        refreshPendingSettlement(career, transition);
         if (transition.getStatus() == Phase2TransitionStatus.COMPLETED) {
             throw conflict("PHASE2_TRANSITION_COMPLETED", "Phase 2 transition already completed", "This career already completed the Phase 2 onboarding");
         }
@@ -202,6 +204,22 @@ public class Phase2TransitionService implements Phase2TransitionOperations {
         careerRepository.flush();
 
         return new Details(transition, contract, money(career.getBalance()), false);
+    }
+
+    private void refreshPendingSettlement(CareerEntity career, Phase2TransitionEntity transition) {
+        if (transition.getStatus() == Phase2TransitionStatus.COMPLETED) return;
+        List<PayslipEntity> payslips = payslipRepository.findAllByCareerIdOrderByGeneratedAtDescIdDesc(career.getId());
+        Phase2TerminationPolicyCatalog.Settlement settlement =
+                terminationPolicyCatalog.quote(career, transition.getEmploymentStartOperationalWeek(), payslips);
+        transition.refreshSettlement(
+                settlement.amount(),
+                settlement.policyVersion(),
+                settlement.policySource(),
+                settlement.policySummary(),
+                json(settlement.snapshot()),
+                clock.instant()
+        );
+        transitionRepository.saveAndFlush(transition);
     }
 
     private Phase2TransitionEntity ensureTransition(CareerEntity career) {
