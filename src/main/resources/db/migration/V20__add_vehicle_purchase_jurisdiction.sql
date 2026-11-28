@@ -1,3 +1,6 @@
+ALTER TABLE financial_contracts
+    ALTER COLUMN jurisdiction_city DROP NOT NULL;
+
 ALTER TABLE career_vehicles
     ADD COLUMN vehicle_condition VARCHAR(12),
     ADD COLUMN purchase_country_code VARCHAR(2),
