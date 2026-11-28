@@ -14,6 +14,7 @@ import java.util.UUID;
 
 public record FinancialContractResponse(
         UUID id,
+        UUID vehicleId,
         FinancialProductType productType,
         FinancialContractStatus status,
         String policyVersion,
@@ -48,6 +49,7 @@ public record FinancialContractResponse(
         FinancialContractEntity contract=details.contract();
         return new FinancialContractResponse(
                 contract.getId(),
+                contract.getVehicleId(),
                 contract.getProductType(),
                 contract.getStatus(),
                 contract.getPolicyVersion(),
