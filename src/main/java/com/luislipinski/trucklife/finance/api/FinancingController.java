@@ -7,6 +7,7 @@ import com.luislipinski.trucklife.identity.application.AccountAuthorization;
 import com.luislipinski.trucklife.identity.application.AuthenticatedAccount;
 import com.luislipinski.trucklife.identity.config.AccessTokenAuthenticationFilter;
 import com.luislipinski.trucklife.identity.domain.UserRole;
+import com.luislipinski.trucklife.shared.error.ApiProblemException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
@@ -20,6 +21,7 @@ import java.net.URI;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.http.CacheControl;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.annotation.Validated;
@@ -47,7 +49,19 @@ public class FinancingController {
     @PostMapping(path="/contracts",consumes=MediaType.APPLICATION_JSON_VALUE,produces=MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary="Create an idempotent financing or personal-loan contract using server policy")
     @ApiResponses({@ApiResponse(responseCode="201",description="Contract created"),@ApiResponse(responseCode="400",description="Invalid request"),@ApiResponse(responseCode="401",description="Authentication required"),@ApiResponse(responseCode="404",description="Career not found"),@ApiResponse(responseCode="409",description="Stale context, balance or unavailable policy")})
-    public ResponseEntity<FinancialContractResponse> create(@PathVariable UUID careerId,@RequestParam CareerGame game,@Valid @RequestBody CreateFinancingContractRequest body,HttpServletRequest request){AuthenticatedAccount a=account(request);FinancialContractResponse response=FinancialContractResponse.from(operations.create(a.userId(),game,careerId,new FinancingOperations.CreateContractCommand(body.operationId(),body.productType(),body.requestedAmount(),body.termPeriods(),body.expectedOperationalWeek(),body.expectedPayrollMonth(),body.expectedBalance())));return ResponseEntity.created(URI.create("/api/v1/careers/"+careerId+"/financing/contracts/"+response.id()+"?game="+game)).cacheControl(CacheControl.noStore()).body(response);}
+    public ResponseEntity<FinancialContractResponse> create(@PathVariable UUID careerId,@RequestParam CareerGame game,@Valid @RequestBody CreateFinancingContractRequest body,HttpServletRequest request){
+        AuthenticatedAccount a=account(request);
+        if(body.productType()==FinancialProductType.VEHICLE_FINANCING){
+            throw new ApiProblemException(
+                    HttpStatus.CONFLICT,
+                    "VEHICLE_ACQUISITION_REQUIRED",
+                    "Vehicle acquisition required",
+                    "Vehicle financing must be contracted through the truck acquisition endpoint so the debt is linked to an owned vehicle"
+            );
+        }
+        FinancialContractResponse response=FinancialContractResponse.from(operations.create(a.userId(),game,careerId,new FinancingOperations.CreateContractCommand(body.operationId(),body.productType(),body.requestedAmount(),body.termPeriods(),body.expectedOperationalWeek(),body.expectedPayrollMonth(),body.expectedBalance())));
+        return ResponseEntity.created(URI.create("/api/v1/careers/"+careerId+"/financing/contracts/"+response.id()+"?game="+game)).cacheControl(CacheControl.noStore()).body(response);
+    }
 
     @GetMapping(path="/contracts",produces=MediaType.APPLICATION_JSON_VALUE)
     @Operation(summary="List financing contracts for the authenticated career")
