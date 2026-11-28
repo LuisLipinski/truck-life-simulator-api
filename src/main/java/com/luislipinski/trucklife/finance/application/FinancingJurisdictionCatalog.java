@@ -97,14 +97,25 @@ public class FinancingJurisdictionCatalog {
     );
 
     public ResolvedPolicy resolve(CareerEntity career, FinancialProductType productType, BigDecimal requestedAmount) {
-        if (career.getGame() == CareerGame.ATS) {
-            return resolveAts(career, productType, requestedAmount);
-        }
-        return resolveEts2(career, productType);
+        return resolve(career, productType, requestedAmount, null, null);
     }
 
-    private ResolvedPolicy resolveAts(CareerEntity career, FinancialProductType productType, BigDecimal requestedAmount) {
-        String stateCode = normalize(career.getStateCode());
+    public ResolvedPolicy resolve(
+            CareerEntity career,
+            FinancialProductType productType,
+            BigDecimal requestedAmount,
+            String jurisdictionCountryCode,
+            String jurisdictionStateCode
+    ) {
+        if (career.getGame() == CareerGame.ATS) {
+            String stateCode = normalizeOrFallback(jurisdictionStateCode, career.getStateCode());
+            return resolveAts(stateCode, productType, requestedAmount);
+        }
+        String countryCode = normalizeOrFallback(jurisdictionCountryCode, career.getCountryCode());
+        return resolveEts2(countryCode, productType);
+    }
+
+    private ResolvedPolicy resolveAts(String stateCode, FinancialProductType productType, BigDecimal requestedAmount) {
         StateRule stateRule = ATS_STATE_RULES.get(stateCode);
         if (stateRule == null) {
             throw new IllegalArgumentException("No researched ATS financing rule is available for state " + stateCode);
@@ -148,8 +159,7 @@ public class FinancingJurisdictionCatalog {
         );
     }
 
-    private ResolvedPolicy resolveEts2(CareerEntity career, FinancialProductType productType) {
-        String country = normalize(career.getCountryCode());
+    private ResolvedPolicy resolveEts2(String country, FinancialProductType productType) {
         MarketReference reference = ETS2_REFERENCES.get(country);
         if (reference == null) {
             throw new IllegalArgumentException("No researched ETS2 financing reference is available for country " + country);
@@ -251,6 +261,11 @@ public class FinancingJurisdictionCatalog {
 
     private String normalize(String value) {
         return value == null ? "" : value.strip().toUpperCase(Locale.ROOT);
+    }
+
+    private String normalizeOrFallback(String candidate, String fallback) {
+        String normalized = normalize(candidate);
+        return normalized.isBlank() ? normalize(fallback) : normalized;
     }
 
     private String percent(BigDecimal value) {
