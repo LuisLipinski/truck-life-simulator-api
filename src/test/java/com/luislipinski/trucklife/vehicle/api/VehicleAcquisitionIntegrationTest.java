@@ -191,6 +191,8 @@ class VehicleAcquisitionIntegrationTest {
         );
         assertThat(created.acquiredOperationalWeek()).isEqualTo(1);
         assertThat(created.acquiredPayrollMonth()).isEqualTo(1);
+        assertThat(created.vehicleCondition()).isEqualTo(VehicleCondition.USED);
+        assertThat(created.purchaseCountryCode()).isEqualTo("DE");
 
         restTestClient.post()
                 .uri(path(career.id(), "ETS2"))
@@ -292,6 +294,20 @@ class VehicleAcquisitionIntegrationTest {
         );
         assertThat(usedOffers[0].jurisdictionCountryCode()).isEqualTo("DE");
         assertThat(usedOffers[0].annualInterestRate()).isEqualByComparingTo("0.0812000000");
+
+        Map<String, Object> request = acquisitionRequest(
+                UUID.randomUUID(), "FINANCED", "MAN", "TGX", 2026, "0.000", "50000.00", 36, 1, 1, "30000.00"
+        );
+        request.put("vehicleCondition", "NEW");
+        request.put("purchaseCountryCode", "PL");
+
+        VehicleResponse created = acquire(token, career.id(), "ETS2", request, 201);
+        assertThat(created.vehicleCondition()).isEqualTo(VehicleCondition.NEW);
+        assertThat(created.purchaseCountryCode()).isEqualTo("PL");
+        assertThat(created.purchaseStateCode()).isNull();
+        var contract = contractRepository.findById(created.financingContractId()).orElseThrow();
+        assertThat(contract.getJurisdictionCountryCode()).isEqualTo("PL");
+        assertThat(contract.getAnnualInterestRate()).isEqualByComparingTo("0.1027000000");
     }
 
     @Test
