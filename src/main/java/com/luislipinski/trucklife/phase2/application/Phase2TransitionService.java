@@ -26,6 +26,7 @@ import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -211,12 +212,20 @@ public class Phase2TransitionService implements Phase2TransitionOperations {
         List<PayslipEntity> payslips = payslipRepository.findAllByCareerIdOrderByGeneratedAtDescIdDesc(career.getId());
         Phase2TerminationPolicyCatalog.Settlement settlement =
                 terminationPolicyCatalog.quote(career, transition.getEmploymentStartOperationalWeek(), payslips);
+        String snapshotJson = json(settlement.snapshot());
+        if (transition.getStatutorySettlementAmount().compareTo(settlement.amount()) == 0
+                && Objects.equals(transition.getPolicyVersion(), settlement.policyVersion())
+                && Objects.equals(transition.getPolicySource(), settlement.policySource())
+                && Objects.equals(transition.getPolicySummary(), settlement.policySummary())
+                && Objects.equals(transition.getPolicySnapshotJson(), snapshotJson)) {
+            return;
+        }
         transition.refreshSettlement(
                 settlement.amount(),
                 settlement.policyVersion(),
                 settlement.policySource(),
                 settlement.policySummary(),
-                json(settlement.snapshot()),
+                snapshotJson,
                 clock.instant()
         );
         transitionRepository.saveAndFlush(transition);
