@@ -15,14 +15,24 @@ import java.util.List;
 import java.util.UUID;
 
 public interface FinancingOperations {
-    List<Offer> offers(UUID userId,CareerGame game,UUID careerId,FinancialProductType productType,BigDecimal requestedAmount);
+    default List<Offer> offers(UUID userId,CareerGame game,UUID careerId,FinancialProductType productType,BigDecimal requestedAmount) {
+        return offers(userId, game, careerId, productType, requestedAmount, null, null);
+    }
+    List<Offer> offers(UUID userId,CareerGame game,UUID careerId,FinancialProductType productType,BigDecimal requestedAmount,
+                       String jurisdictionCountryCode,String jurisdictionStateCode);
     ContractDetails create(UUID userId,CareerGame game,UUID careerId,CreateContractCommand command);
     List<ContractDetails> list(UUID userId,CareerGame game,UUID careerId);
     ContractDetails get(UUID userId,CareerGame game,UUID careerId,UUID contractId);
     ContractDetails pay(UUID userId,CareerGame game,UUID careerId,UUID contractId,PaymentCommand command);
 
     record CreateContractCommand(UUID operationId,FinancialProductType productType,BigDecimal requestedAmount,int termPeriods,
-                                 Integer expectedOperationalWeek,Integer expectedPayrollMonth,BigDecimal expectedBalance) {}
+                                 Integer expectedOperationalWeek,Integer expectedPayrollMonth,BigDecimal expectedBalance,
+                                 String jurisdictionCountryCode,String jurisdictionStateCode) {
+        public CreateContractCommand(UUID operationId,FinancialProductType productType,BigDecimal requestedAmount,int termPeriods,
+                                     Integer expectedOperationalWeek,Integer expectedPayrollMonth,BigDecimal expectedBalance) {
+            this(operationId,productType,requestedAmount,termPeriods,expectedOperationalWeek,expectedPayrollMonth,expectedBalance,null,null);
+        }
+    }
     record PaymentCommand(UUID operationId,FinancialPaymentType paymentType,BigDecimal amount,Integer expectedOperationalWeek,
                           Integer expectedPayrollMonth,BigDecimal expectedBalance) {}
     record Offer(FinancialProductType productType,String policyVersion,String policySource,LocalDate policyReferenceAsOf,String rateBasis,
