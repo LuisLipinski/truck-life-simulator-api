@@ -70,9 +70,6 @@ public class VehicleController {
             HttpServletRequest request
     ) {
         AuthenticatedAccount account = account(request);
-        var replay = operations.list(account.userId(), game, careerId).stream()
-                .filter(item -> item.vehicle().getAcquisitionOperationId().equals(body.operationId()))
-                .findFirst();
         var details = operations.acquire(
                 account.userId(),
                 game,
@@ -92,7 +89,7 @@ public class VehicleController {
                 )
         );
         VehicleResponse response = VehicleResponse.from(details);
-        if (replay.isPresent()) {
+        if (details.replay()) {
             return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(response);
         }
         return ResponseEntity.created(
