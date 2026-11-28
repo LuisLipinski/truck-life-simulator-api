@@ -79,6 +79,13 @@ public class VehicleService implements VehicleOperations {
         }
 
         CareerEntity career = lockedCareer(userId, game, careerId);
+        if (vehicleRepository.existsByCareerIdAndStatus(careerId, VehicleStatus.ACTIVE)) {
+            throw conflict(
+                    "FIRST_TRUCK_ALREADY_ACQUIRED",
+                    "Active owned truck already exists",
+                    "Truck replacement and multiple owned vehicles are not enabled in this phase yet"
+            );
+        }
         validateContext(career, command.expectedOperationalWeek(), command.expectedPayrollMonth());
         BigDecimal expectedBalance = money(command.expectedBalance(), "Expected balance");
         BigDecimal currentBalance = career.getBalance().setScale(2, RoundingMode.UNNECESSARY);
@@ -87,13 +94,6 @@ public class VehicleService implements VehicleOperations {
                     "VEHICLE_BALANCE_CONFLICT",
                     "Career balance changed",
                     "The expected balance no longer matches the current career balance"
-            );
-        }
-        if (vehicleRepository.existsByCareerIdAndStatus(careerId, VehicleStatus.ACTIVE)) {
-            throw conflict(
-                    "FIRST_TRUCK_ALREADY_ACQUIRED",
-                    "Active owned truck already exists",
-                    "Truck replacement and multiple owned vehicles are not enabled in this phase yet"
             );
         }
 
