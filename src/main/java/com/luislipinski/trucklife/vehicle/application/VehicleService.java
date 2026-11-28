@@ -145,7 +145,16 @@ public class VehicleService implements VehicleOperations {
                             expectedBalance
                     )
             );
-            financingContractId = contractDetails.contract().getId();
+            FinancialContractEntity financingContract = contractDetails.contract();
+            if (financingContract.getProductType() != FinancialProductType.VEHICLE_FINANCING
+                    || financingContract.getRequestedAmount().compareTo(purchasePrice) != 0) {
+                throw conflict(
+                        "VEHICLE_FINANCING_OPERATION_CONFLICT",
+                        "Financing operation conflict",
+                        "The supplied operationId already represents a different financial contract"
+                );
+            }
+            financingContractId = financingContract.getId();
         } else {
             throw badRequest(
                     "VEHICLE_ACQUISITION_TYPE_INVALID",
