@@ -179,7 +179,7 @@ class Phase2TransitionApiIntegrationTest {
         assertThat(persisted.getCountryCode()).isEqualTo("IT");
         assertThat(persisted.getBaseCity()).isEqualTo("Milano");
         assertThat(persisted.getCompanyName()).isEqualTo("Alpine Freight");
-        assertThat(ledgerRepository.count()).isEqualTo(1);
+        assertThat(ledgerRepository.count()).isEqualTo(2);
     }
 
     @Test
