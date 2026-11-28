@@ -58,7 +58,7 @@ public class VehicleService implements VehicleOperations {
     public List<VehicleDetails> list(UUID userId, CareerGame game, UUID careerId) {
         CareerEntity career = ownedCareer(userId, game, careerId);
         return vehicleRepository.findAllByCareerIdOrderByCreatedAtAscIdAsc(careerId).stream()
-                .map(vehicle -> details(vehicle, career))
+                .map(vehicle -> details(vehicle, career, false))
                 .toList();
     }
 
@@ -75,7 +75,7 @@ public class VehicleService implements VehicleOperations {
                 );
             }
             CareerEntity replayCareer = ownedCareer(userId, game, careerId);
-            return details(replay, replayCareer);
+            return details(replay, replayCareer, true);
         }
 
         CareerEntity career = lockedCareer(userId, game, careerId);
@@ -208,14 +208,14 @@ public class VehicleService implements VehicleOperations {
         career.unlockPhase2(now);
         career.updateDefaultTruck(make, model, now);
         careerRepository.flush();
-        return new VehicleDetails(vehicle, financingContractId, career.getCurrentPhase(), career.getBalance());
+        return new VehicleDetails(vehicle, financingContractId, career.getCurrentPhase(), career.getBalance(), false);
     }
 
-    private VehicleDetails details(CareerVehicleEntity vehicle, CareerEntity career) {
+    private VehicleDetails details(CareerVehicleEntity vehicle, CareerEntity career, boolean replay) {
         UUID contractId = contractRepository.findByVehicleId(vehicle.getId())
                 .map(FinancialContractEntity::getId)
                 .orElse(null);
-        return new VehicleDetails(vehicle, contractId, career.getCurrentPhase(), career.getBalance());
+        return new VehicleDetails(vehicle, contractId, career.getCurrentPhase(), career.getBalance(), replay);
     }
 
     private CareerEntity ownedCareer(UUID userId, CareerGame game, UUID careerId) {
