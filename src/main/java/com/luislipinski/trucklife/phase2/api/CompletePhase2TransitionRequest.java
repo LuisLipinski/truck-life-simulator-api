@@ -1,7 +1,6 @@
 package com.luislipinski.trucklife.phase2.api;
 
 import com.luislipinski.trucklife.phase2.domain.Phase2AffiliationChoice;
-import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
 import java.math.BigDecimal;
@@ -15,6 +14,6 @@ public record CompletePhase2TransitionRequest(
         @Size(min = 2, max = 10) String carrierCountryCode,
         @Size(min = 2, max = 10) String carrierStateCode,
         @NotNull DayOfWeek effectiveDay,
-        @NotNull @DecimalMin("0.00") BigDecimal expectedBalance
+        @NotNull BigDecimal expectedBalance
 ) {
 }
