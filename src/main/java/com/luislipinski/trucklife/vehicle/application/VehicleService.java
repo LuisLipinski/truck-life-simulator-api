@@ -3,6 +3,7 @@ package com.luislipinski.trucklife.vehicle.application;
 import com.luislipinski.trucklife.career.domain.CareerGame;
 import com.luislipinski.trucklife.career.persistence.CareerEntity;
 import com.luislipinski.trucklife.career.persistence.CareerRepository;
+import com.luislipinski.trucklife.finance.application.FinancingJurisdictionCatalog;
 import com.luislipinski.trucklife.finance.application.FinancingOperations;
 import com.luislipinski.trucklife.finance.domain.FinancialProductType;
 import com.luislipinski.trucklife.finance.persistence.FinancialContractEntity;
@@ -14,6 +15,7 @@ import com.luislipinski.trucklife.ledger.domain.LedgerSourceType;
 import com.luislipinski.trucklife.shared.error.ApiProblemException;
 import com.luislipinski.trucklife.shared.error.ResourceNotFoundException;
 import com.luislipinski.trucklife.vehicle.domain.VehicleAcquisitionType;
+import com.luislipinski.trucklife.vehicle.domain.VehicleCondition;
 import com.luislipinski.trucklife.vehicle.domain.VehicleStatus;
 import com.luislipinski.trucklife.vehicle.persistence.CareerVehicleEntity;
 import com.luislipinski.trucklife.vehicle.persistence.CareerVehicleRepository;
@@ -33,6 +35,7 @@ public class VehicleService implements VehicleOperations {
     private final CareerRepository careerRepository;
     private final CareerVehicleRepository vehicleRepository;
     private final FinancingOperations financingOperations;
+    private final FinancingJurisdictionCatalog financingJurisdictionCatalog;
     private final FinancialContractRepository contractRepository;
     private final LedgerWriter ledgerWriter;
     private final Clock clock;
@@ -41,6 +44,7 @@ public class VehicleService implements VehicleOperations {
             CareerRepository careerRepository,
             CareerVehicleRepository vehicleRepository,
             FinancingOperations financingOperations,
+            FinancingJurisdictionCatalog financingJurisdictionCatalog,
             FinancialContractRepository contractRepository,
             LedgerWriter ledgerWriter,
             Clock clock
@@ -48,6 +52,7 @@ public class VehicleService implements VehicleOperations {
         this.careerRepository = careerRepository;
         this.vehicleRepository = vehicleRepository;
         this.financingOperations = financingOperations;
+        this.financingJurisdictionCatalog = financingJurisdictionCatalog;
         this.contractRepository = contractRepository;
         this.ledgerWriter = ledgerWriter;
         this.clock = clock;
@@ -60,6 +65,33 @@ public class VehicleService implements VehicleOperations {
         return vehicleRepository.findAllByCareerIdOrderByCreatedAtAscIdAsc(careerId).stream()
                 .map(vehicle -> details(vehicle, career, false))
                 .toList();
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FinancingOperations.Offer> financingOffers(
+            UUID userId,
+            CareerGame game,
+            UUID careerId,
+            VehicleCondition condition,
+            BigDecimal purchasePrice,
+            String purchaseCountryCode,
+            String purchaseStateCode
+    ) {
+        CareerEntity career = ownedCareer(userId, game, careerId);
+        BigDecimal amount = positiveMoney(purchasePrice, "Purchase price");
+        PurchaseJurisdiction jurisdiction = resolvePurchaseJurisdiction(
+                career, condition, purchaseCountryCode, purchaseStateCode);
+        validatePurchaseJurisdiction(game, jurisdiction);
+        return financingOperations.offers(
+                userId,
+                game,
+                careerId,
+                FinancialProductType.VEHICLE_FINANCING,
+                amount,
+                jurisdiction.countryCode(),
+                jurisdiction.stateCode()
+        );
     }
 
     @Override
@@ -102,6 +134,13 @@ public class VehicleService implements VehicleOperations {
         Short modelYear = validateYear(command.modelYear());
         BigDecimal odometer = nonNegative(command.initialOdometer(), 3, "Initial odometer");
         BigDecimal purchasePrice = positiveMoney(command.purchasePrice(), "Purchase price");
+        PurchaseJurisdiction purchaseJurisdiction = resolvePurchaseJurisdiction(
+                career,
+                command.vehicleCondition(),
+                command.purchaseCountryCode(),
+                command.purchaseStateCode()
+        );
+        validatePurchaseJurisdiction(game, purchaseJurisdiction);
         Instant now = clock.instant();
         UUID vehicleId = UUID.randomUUID();
         Integer payrollMonth = game == CareerGame.ETS2 ? career.getCurrentPayrollMonth() : null;
@@ -142,7 +181,9 @@ public class VehicleService implements VehicleOperations {
                             command.financingTermPeriods(),
                             command.expectedOperationalWeek(),
                             command.expectedPayrollMonth(),
-                            expectedBalance
+                            expectedBalance,
+                            purchaseJurisdiction.countryCode(),
+                            purchaseJurisdiction.stateCode()
                     )
             );
             FinancialContractEntity financingContract = contractDetails.contract();
@@ -173,6 +214,9 @@ public class VehicleService implements VehicleOperations {
                 odometer,
                 purchasePrice,
                 career.getDisplayCurrency(),
+                command.vehicleCondition(),
+                purchaseJurisdiction.countryCode(),
+                purchaseJurisdiction.stateCode(),
                 command.acquisitionType(),
                 VehicleStatus.ACTIVE,
                 career.getCurrentOperationalWeek(),
@@ -208,6 +252,9 @@ public class VehicleService implements VehicleOperations {
                     Map.of(
                             "vehicleId", vehicleId.toString(),
                             "acquisitionType", VehicleAcquisitionType.CASH.name(),
+                            "vehicleCondition", command.vehicleCondition().name(),
+                            "purchaseCountryCode", purchaseJurisdiction.countryCode(),
+                            "purchaseStateCode", purchaseJurisdiction.stateCode() == null ? "" : purchaseJurisdiction.stateCode(),
                             "purchasePrice", purchasePrice
                     ),
                     now
@@ -242,6 +289,99 @@ public class VehicleService implements VehicleOperations {
                         "The requested career does not exist"
                 ));
     }
+
+    private PurchaseJurisdiction resolvePurchaseJurisdiction(
+            CareerEntity career,
+            VehicleCondition condition,
+            String requestedCountryCode,
+            String requestedStateCode
+    ) {
+        if (condition == null) {
+            throw badRequest("VEHICLE_CONDITION_REQUIRED", "Truck condition required", "Truck condition must be NEW or USED");
+        }
+        String requestedCountry = normalizeCode(requestedCountryCode);
+        String requestedState = normalizeCode(requestedStateCode);
+
+        if (career.getGame() == CareerGame.ATS) {
+            String headquartersState = normalizeCode(career.getStateCode());
+            if (condition == VehicleCondition.USED) {
+                if ((!requestedCountry.isBlank() && !"US".equals(requestedCountry))
+                        || (!requestedState.isBlank() && !headquartersState.equals(requestedState))) {
+                    throw badRequest(
+                            "USED_TRUCK_JURISDICTION_FIXED",
+                            "Used truck jurisdiction is fixed",
+                            "Used trucks use the career headquarters state for purchase and financing rules"
+                    );
+                }
+                return new PurchaseJurisdiction("US", headquartersState);
+            }
+            if (requestedState.isBlank()) {
+                throw badRequest(
+                        "NEW_TRUCK_PURCHASE_STATE_REQUIRED",
+                        "Purchase state required",
+                        "Select the ATS state where the new truck was purchased"
+                );
+            }
+            if (!requestedCountry.isBlank() && !"US".equals(requestedCountry)) {
+                throw badRequest(
+                        "NEW_TRUCK_PURCHASE_COUNTRY_INVALID",
+                        "Purchase country invalid",
+                        "ATS truck purchases must use the United States"
+                );
+            }
+            return new PurchaseJurisdiction("US", requestedState);
+        }
+
+        String headquartersCountry = normalizeCode(career.getCountryCode());
+        if (condition == VehicleCondition.USED) {
+            if ((!requestedCountry.isBlank() && !headquartersCountry.equals(requestedCountry))
+                    || !requestedState.isBlank()) {
+                throw badRequest(
+                        "USED_TRUCK_JURISDICTION_FIXED",
+                        "Used truck jurisdiction is fixed",
+                        "Used trucks use the career headquarters country for purchase and financing rules"
+                );
+            }
+            return new PurchaseJurisdiction(headquartersCountry, null);
+        }
+        if (requestedCountry.isBlank()) {
+            throw badRequest(
+                    "NEW_TRUCK_PURCHASE_COUNTRY_REQUIRED",
+                    "Purchase country required",
+                    "Select the ETS2 country where the new truck was purchased"
+            );
+        }
+        if (!requestedState.isBlank()) {
+            throw badRequest(
+                    "NEW_TRUCK_PURCHASE_STATE_INVALID",
+                    "Purchase state invalid",
+                    "ETS2 truck purchases use country jurisdiction, not a state"
+            );
+        }
+        return new PurchaseJurisdiction(requestedCountry, null);
+    }
+
+    private void validatePurchaseJurisdiction(CareerGame game, PurchaseJurisdiction jurisdiction) {
+        try {
+            financingJurisdictionCatalog.validateVehiclePurchaseJurisdiction(
+                    game,
+                    jurisdiction.countryCode(),
+                    jurisdiction.stateCode()
+            );
+        } catch (IllegalArgumentException ex) {
+            throw badRequest(
+                    "VEHICLE_PURCHASE_JURISDICTION_UNAVAILABLE",
+                    "Purchase jurisdiction unavailable",
+                    ex.getMessage()
+            );
+        }
+    }
+
+    private String normalizeCode(String value) {
+        return value == null ? "" : value.strip().toUpperCase(java.util.Locale.ROOT);
+    }
+
+    private record PurchaseJurisdiction(String countryCode, String stateCode) {}
 
     private void validateContext(CareerEntity career, Integer expectedWeek, Integer expectedMonth) {
         if (expectedWeek == null || expectedWeek != career.getCurrentOperationalWeek()) {
