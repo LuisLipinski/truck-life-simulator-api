@@ -22,15 +22,15 @@ class PostgresMigrationTest {
     @Container @ServiceConnection static final PostgreSQLContainer POSTGRES=new PostgreSQLContainer(DockerImageName.parse("postgres:18-alpine"));
     @Autowired JdbcTemplate jdbcTemplate;@Autowired RestTestClient restTestClient;
 
-    @Test void appliesAllDomainMigrationsThroughVehiclePurchaseJurisdictionV20(){
+    @Test void appliesAllDomainMigrationsThroughPhase2TransitionV21(){
         Integer tableCount=jdbcTemplate.queryForObject("""
                 SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='public' AND table_name IN (
                 'platform_metadata','users','refresh_tokens','user_action_tokens','careers','career_events','trips','payroll_periods','payslips','payslip_lines',
                 'incidents','incident_payslip_deductions','academy_progress','qualifications','monthly_expenses','monthly_expense_applications','emergency_reserve','emergency_reserve_events','ledger_entries',
-                'financial_contracts','financial_installments','financial_payments','financial_contract_events','career_import_operations','career_import_archives','trip_drafts','plans','plan_features','subscriptions','career_vehicles')
+                'financial_contracts','financial_installments','financial_payments','financial_contract_events','career_import_operations','career_import_archives','trip_drafts','plans','plan_features','subscriptions','career_vehicles','phase2_transitions','carrier_contracts')
                 """,Integer.class);
         String latest=jdbcTemplate.queryForObject("SELECT version FROM flyway_schema_history WHERE success=TRUE AND version IS NOT NULL ORDER BY installed_rank DESC LIMIT 1",String.class);
-        assertThat(tableCount).isEqualTo(30);assertThat(latest).isEqualTo("20");
+        assertThat(tableCount).isEqualTo(32);assertThat(latest).isEqualTo("21");
         assertThat(columns("careers")).contains("current_phase","current_operational_week","current_payroll_month","dangerous_goods_qualified",
                 "payroll_level1_gross_override","payroll_route_overrun_rate_override","payroll_benefits_override","payroll_per_diem_rate_override");
         assertThat(columns("payslips")).contains("incident_deduction_amount","reserve_interest_amount","reserve_contribution_amount","balance_credit_amount","context_snapshot_json");
@@ -51,8 +51,10 @@ class PostgresMigrationTest {
         assertThat(columns("plans")).contains("id","code","name","active","price_cents","currency","billing_period","created_at");
         assertThat(columns("plan_features")).contains("id","plan_id","feature_code","enabled","limit_value");
         assertThat(columns("subscriptions")).contains("id","user_id","plan_id","status","started_at","current_period_start","current_period_end","cancel_at_period_end","canceled_at","created_at","updated_at","version");
+        assertThat(columns("phase2_transitions")).contains("id","career_id","completion_operation_id","status","previous_company_name","termination_reason","termination_country_code","termination_state_code","employment_start_operational_week","termination_operational_week","termination_effective_day","statutory_settlement_amount","display_currency","policy_version","policy_source","policy_summary","policy_snapshot_json","selected_affiliation","completed_at","created_at","updated_at","version");
+        assertThat(columns("carrier_contracts")).contains("id","career_id","transition_id","status","carrier_name","affiliation_origin","jurisdiction_country_code","jurisdiction_state_code","compensation_rule_key","compensation_policy_status","started_operational_week","started_effective_day","created_at","updated_at","version");
         List<String> indexes=jdbcTemplate.queryForList("SELECT indexname FROM pg_indexes WHERE schemaname='public'",String.class);
-        assertThat(indexes).contains("idx_careers_user_game_created_at","idx_trips_career_week_created_at","idx_payslips_career_generated_at","idx_incidents_career_recorded_at","idx_academy_progress_career_completed","idx_qualifications_career_acquired","idx_monthly_expenses_career_type","idx_monthly_expense_applications_career_applied","idx_emergency_reserve_events_career_recorded","idx_ledger_entries_career_recorded","idx_ledger_entries_career_type","idx_financial_contracts_career_status","idx_financial_installments_contract_due","idx_financial_payments_contract_recorded","idx_financial_contract_events_contract_recorded","idx_career_import_operations_user_created","idx_career_import_operations_imported_career","idx_career_import_archives_archived_at","idx_plan_features_plan","idx_subscriptions_user_status","uq_subscriptions_user_open","idx_career_vehicles_career_created","uq_career_vehicles_active","uq_financial_contracts_vehicle","idx_career_vehicles_purchase_jurisdiction");
+        assertThat(indexes).contains("idx_careers_user_game_created_at","idx_trips_career_week_created_at","idx_payslips_career_generated_at","idx_incidents_career_recorded_at","idx_academy_progress_career_completed","idx_qualifications_career_acquired","idx_monthly_expenses_career_type","idx_monthly_expense_applications_career_applied","idx_emergency_reserve_events_career_recorded","idx_ledger_entries_career_recorded","idx_ledger_entries_career_type","idx_financial_contracts_career_status","idx_financial_installments_contract_due","idx_financial_payments_contract_recorded","idx_financial_contract_events_contract_recorded","idx_career_import_operations_user_created","idx_career_import_operations_imported_career","idx_career_import_archives_archived_at","idx_plan_features_plan","idx_subscriptions_user_status","uq_subscriptions_user_open","idx_career_vehicles_career_created","uq_career_vehicles_active","uq_financial_contracts_vehicle","idx_career_vehicles_purchase_jurisdiction","idx_phase2_transitions_status","idx_carrier_contracts_career_created","uq_carrier_contracts_active");
         assertThat(constraints("careers")).contains("chk_careers_payroll_level1_gross_override","chk_careers_payroll_route_overrun_rate_override","chk_careers_payroll_benefits_override","chk_careers_payroll_per_diem_rate_override");
         assertThat(constraints("monthly_expenses")).contains("fk_monthly_expenses_career","chk_monthly_expenses_type","chk_monthly_expenses_category","uq_monthly_expenses_career_category");
         assertThat(constraints("emergency_reserve_events")).contains("fk_emergency_reserve_events_career","fk_emergency_reserve_events_payslip","chk_emergency_reserve_events_type","uq_emergency_reserve_payslip_event");
@@ -69,12 +71,14 @@ class PostgresMigrationTest {
         assertThat(constraints("plans")).contains("chk_plans_code","chk_plans_price","chk_plans_currency");
         assertThat(constraints("plan_features")).contains("fk_plan_features_plan","uq_plan_features_plan_code","chk_plan_features_code","chk_plan_features_limit");
         assertThat(constraints("subscriptions")).contains("fk_subscriptions_user","fk_subscriptions_plan","chk_subscriptions_status","chk_subscriptions_period");
+        assertThat(constraints("phase2_transitions")).contains("fk_phase2_transitions_career","uq_phase2_transitions_career","uq_phase2_transitions_operation","chk_phase2_transitions_status","chk_phase2_transitions_reason","chk_phase2_transitions_start_week","chk_phase2_transitions_end_week","chk_phase2_transitions_day","chk_phase2_transitions_settlement","chk_phase2_transitions_currency","chk_phase2_transitions_affiliation","chk_phase2_transitions_completion");
+        assertThat(constraints("carrier_contracts")).contains("fk_carrier_contracts_career","fk_carrier_contracts_transition","uq_carrier_contracts_transition","chk_carrier_contracts_status","chk_carrier_contracts_origin","chk_carrier_contracts_name","chk_carrier_contracts_rule_key","chk_carrier_contracts_policy_status","chk_carrier_contracts_week","chk_carrier_contracts_day");
     }
 
     @Test void exposesTheAppliedFlywayStateWithoutSensitiveDatabaseData(){
         restTestClient.get().uri("/actuator/info").exchange().expectStatus().isOk().expectBody()
                 .jsonPath("$.app.commit").isEqualTo("test-commit").jsonPath("$.app.branch").isEqualTo("test-branch")
-                .jsonPath("$.databaseSchema.currentVersion").isEqualTo("20").jsonPath("$.databaseSchema.pendingMigrations").isEqualTo(0);
+                .jsonPath("$.databaseSchema.currentVersion").isEqualTo("21").jsonPath("$.databaseSchema.pendingMigrations").isEqualTo(0);
     }
 
     private List<String> columns(String table){return jdbcTemplate.queryForList("SELECT column_name FROM information_schema.columns WHERE table_schema='public' AND table_name=? ORDER BY ordinal_position",String.class,table);}
