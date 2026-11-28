@@ -31,7 +31,7 @@ public class FinancialContractEntity {
     @Column(name="rate_basis",nullable=false,length=80) private String rateBasis;
     @Column(name="jurisdiction_country_code",length=10) private String jurisdictionCountryCode;
     @Column(name="jurisdiction_state_code",length=10) private String jurisdictionStateCode;
-    @Column(name="jurisdiction_city",nullable=false,length=160) private String jurisdictionCity;
+    @Column(name="jurisdiction_city",length=160) private String jurisdictionCity;
     @Column(name="display_currency",nullable=false,length=3) private String displayCurrency;
     @Column(name="requested_amount",nullable=false,precision=14,scale=2) private BigDecimal requestedAmount;
     @Column(nullable=false,precision=14,scale=2) private BigDecimal principal;
