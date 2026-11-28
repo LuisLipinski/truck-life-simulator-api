@@ -3,6 +3,7 @@ package com.luislipinski.trucklife.vehicle.api;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.luislipinski.trucklife.career.api.CareerResponse;
+import com.luislipinski.trucklife.career.domain.CareerGame;
 import com.luislipinski.trucklife.career.persistence.CareerEntity;
 import com.luislipinski.trucklife.career.persistence.CareerRepository;
 import com.luislipinski.trucklife.finance.persistence.FinancialContractEventRepository;
@@ -15,6 +16,8 @@ import com.luislipinski.trucklife.identity.domain.UserStatus;
 import com.luislipinski.trucklife.identity.persistence.UserEntity;
 import com.luislipinski.trucklife.identity.persistence.UserRepository;
 import com.luislipinski.trucklife.ledger.persistence.LedgerEntryRepository;
+import com.luislipinski.trucklife.shared.error.ApiProblemException;
+import com.luislipinski.trucklife.vehicle.application.VehicleOperations;
 import com.luislipinski.trucklife.vehicle.domain.VehicleAcquisitionType;
 import com.luislipinski.trucklife.vehicle.persistence.CareerVehicleRepository;
 import java.math.BigDecimal;
@@ -24,6 +27,8 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Executors;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -60,6 +65,7 @@ class VehicleAcquisitionIntegrationTest {
     @Autowired FinancialPaymentRepository paymentRepository;
     @Autowired FinancialContractEventRepository contractEventRepository;
     @Autowired LedgerEntryRepository ledgerRepository;
+    @Autowired VehicleOperations vehicleOperations;
     @Autowired JwtAccessTokenIssuer tokenIssuer;
 
     @BeforeEach
@@ -211,6 +217,31 @@ class VehicleAcquisitionIntegrationTest {
     }
 
     @Test
+    void serializesConcurrentFirstTruckAcquisitionsWithoutDoubleDebit() throws Exception {
+        UserEntity owner = saveUser("concurrent-truck@example.com");
+        String token = token(owner);
+        CareerResponse career = createCareer(token, "ATS", "120000.00", "USD", "US", "AZ", "Phoenix, AZ");
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        try (var executor = Executors.newFixedThreadPool(2)) {
+            var first = executor.submit(() -> concurrentCashAcquire(owner, career, "Peterbilt", "579", ready, start));
+            var second = executor.submit(() -> concurrentCashAcquire(owner, career, "Kenworth", "T680", ready, start));
+
+            ready.await();
+            start.countDown();
+
+            assertThat(java.util.List.of(first.get(), second.get()))
+                    .containsExactlyInAnyOrder("SUCCESS", "FIRST_TRUCK_ALREADY_ACQUIRED");
+        }
+
+        assertThat(vehicleRepository.count()).isEqualTo(1);
+        CareerEntity persisted = careerRepository.findById(career.id()).orElseThrow();
+        assertThat(persisted.getBalance()).isEqualByComparingTo("40000.00");
+        assertThat(persisted.getCurrentPhase()).isEqualTo((short) 2);
+    }
+
+    @Test
     void enforcesOwnershipAndDocumentsVehicleEndpoints() {
         UserEntity owner = saveUser("vehicle-owner@example.com");
         UserEntity intruder = saveUser("vehicle-intruder@example.com");
@@ -236,6 +267,41 @@ class VehicleAcquisitionIntegrationTest {
                 .expectBody()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/vehicles'].get.responses['200']").exists()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/vehicles/acquisitions'].post.responses['201']").exists();
+    }
+
+    private String concurrentCashAcquire(
+            UserEntity owner,
+            CareerResponse career,
+            String make,
+            String model,
+            CountDownLatch ready,
+            CountDownLatch start
+    ) throws Exception {
+        ready.countDown();
+        start.await();
+        try {
+            vehicleOperations.acquire(
+                    owner.getId(),
+                    CareerGame.ATS,
+                    career.id(),
+                    new VehicleOperations.AcquireVehicleCommand(
+                            UUID.randomUUID(),
+                            VehicleAcquisitionType.CASH,
+                            make,
+                            model,
+                            (short) 2026,
+                            new BigDecimal("0.000"),
+                            new BigDecimal("80000.00"),
+                            null,
+                            1,
+                            null,
+                            new BigDecimal("120000.00")
+                    )
+            );
+            return "SUCCESS";
+        } catch (ApiProblemException ex) {
+            return ex.code();
+        }
     }
 
     private VehicleResponse acquire(String token, UUID careerId, String game, Map<String, Object> body, int status) {
