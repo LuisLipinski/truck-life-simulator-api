@@ -19,6 +19,7 @@ import com.luislipinski.trucklife.ledger.persistence.LedgerEntryRepository;
 import com.luislipinski.trucklife.shared.error.ApiProblemException;
 import com.luislipinski.trucklife.vehicle.application.VehicleOperations;
 import com.luislipinski.trucklife.vehicle.domain.VehicleAcquisitionType;
+import com.luislipinski.trucklife.vehicle.domain.VehicleCondition;
 import com.luislipinski.trucklife.vehicle.persistence.CareerVehicleRepository;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -217,6 +218,83 @@ class VehicleAcquisitionIntegrationTest {
     }
 
     @Test
+    void newAtsTruckUsesSelectedPurchaseStateWithoutInventingAStateSpecificBaseRate() {
+        UserEntity owner = saveUser("ats-purchase-state@example.com");
+        String token = token(owner);
+        CareerResponse career = createCareer(token, "ATS", "30000.00", "USD", "US", "AZ", "Phoenix, AZ");
+
+        var offers = Objects.requireNonNull(
+                restTestClient.get()
+                        .uri(CAREERS + "/" + career.id() + "/vehicles/financing-offers?game=ATS&condition=NEW&purchasePrice=100000.00&purchaseStateCode=TX")
+                        .headers(headers -> headers.setBearerAuth(token))
+                        .exchange()
+                        .expectStatus().isOk()
+                        .expectBody(com.luislipinski.trucklife.finance.api.FinancingOfferResponse[].class)
+                        .returnResult()
+                        .getResponseBody()
+        );
+        assertThat(offers).hasSize(3);
+        assertThat(offers[0].jurisdictionStateCode()).isEqualTo("TX");
+        assertThat(offers[0].annualInterestRate()).isEqualByComparingTo("0.0714000000");
+
+        Map<String, Object> request = acquisitionRequest(
+                UUID.randomUUID(), "FINANCED", "Kenworth", "T680", 2026, "0.000", "100000.00", 78, 1, null, "30000.00"
+        );
+        request.put("vehicleCondition", "NEW");
+        request.put("purchaseStateCode", "TX");
+
+        VehicleResponse created = acquire(token, career.id(), "ATS", request, 201);
+        assertThat(created.vehicleCondition()).isEqualTo(VehicleCondition.NEW);
+        assertThat(created.purchaseCountryCode()).isEqualTo("US");
+        assertThat(created.purchaseStateCode()).isEqualTo("TX");
+        var contract = contractRepository.findById(created.financingContractId()).orElseThrow();
+        assertThat(contract.getJurisdictionStateCode()).isEqualTo("TX");
+        assertThat(contract.getAnnualInterestRate()).isEqualByComparingTo("0.0714000000");
+    }
+
+    @Test
+    void newEts2TruckUsesSelectedPurchaseCountryWhileUsedTruckIsForcedToHeadquarters() {
+        UserEntity owner = saveUser("ets-purchase-country@example.com");
+        String token = token(owner);
+        CareerResponse career = createCareer(token, "ETS2", "30000.00", "EUR", "DE", null, "Berlin");
+
+        var offers = Objects.requireNonNull(
+                restTestClient.get()
+                        .uri(CAREERS + "/" + career.id() + "/vehicles/financing-offers?game=ETS2&condition=NEW&purchasePrice=50000.00&purchaseCountryCode=PL")
+                        .headers(headers -> headers.setBearerAuth(token))
+                        .exchange()
+                        .expectStatus().isOk()
+                        .expectBody(com.luislipinski.trucklife.finance.api.FinancingOfferResponse[].class)
+                        .returnResult()
+                        .getResponseBody()
+        );
+        assertThat(offers).hasSize(3);
+        assertThat(offers[0].jurisdictionCountryCode()).isEqualTo("PL");
+        assertThat(offers[0].annualInterestRate()).isEqualByComparingTo("0.1027000000");
+
+        restTestClient.get()
+                .uri(CAREERS + "/" + career.id() + "/vehicles/financing-offers?game=ETS2&condition=USED&purchasePrice=50000.00&purchaseCountryCode=PL")
+                .headers(headers -> headers.setBearerAuth(token))
+                .exchange()
+                .expectStatus().isBadRequest()
+                .expectBody()
+                .jsonPath("$.code").isEqualTo("USED_TRUCK_JURISDICTION_FIXED");
+
+        var usedOffers = Objects.requireNonNull(
+                restTestClient.get()
+                        .uri(CAREERS + "/" + career.id() + "/vehicles/financing-offers?game=ETS2&condition=USED&purchasePrice=50000.00")
+                        .headers(headers -> headers.setBearerAuth(token))
+                        .exchange()
+                        .expectStatus().isOk()
+                        .expectBody(com.luislipinski.trucklife.finance.api.FinancingOfferResponse[].class)
+                        .returnResult()
+                        .getResponseBody()
+        );
+        assertThat(usedOffers[0].jurisdictionCountryCode()).isEqualTo("DE");
+        assertThat(usedOffers[0].annualInterestRate()).isEqualByComparingTo("0.0812000000");
+    }
+
+    @Test
     void serializesConcurrentFirstTruckAcquisitionsWithoutDoubleDebit() throws Exception {
         UserEntity owner = saveUser("concurrent-truck@example.com");
         String token = token(owner);
@@ -266,6 +344,7 @@ class VehicleAcquisitionIntegrationTest {
                 .expectStatus().isOk()
                 .expectBody()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/vehicles'].get.responses['200']").exists()
+                .jsonPath("$.paths['/api/v1/careers/{careerId}/vehicles/financing-offers'].get.responses['200']").exists()
                 .jsonPath("$.paths['/api/v1/careers/{careerId}/vehicles/acquisitions'].post.responses['201']").exists();
     }
 
@@ -287,6 +366,9 @@ class VehicleAcquisitionIntegrationTest {
                     new VehicleOperations.AcquireVehicleCommand(
                             UUID.randomUUID(),
                             VehicleAcquisitionType.CASH,
+                            VehicleCondition.USED,
+                            null,
+                            null,
                             make,
                             model,
                             (short) 2026,
@@ -348,6 +430,7 @@ class VehicleAcquisitionIntegrationTest {
         Map<String, Object> value = new LinkedHashMap<>();
         value.put("operationId", operationId);
         value.put("acquisitionType", acquisitionType);
+        value.put("vehicleCondition", "USED");
         value.put("make", make);
         value.put("model", model);
         value.put("modelYear", year);
