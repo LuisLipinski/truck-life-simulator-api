@@ -2,6 +2,7 @@ package com.luislipinski.trucklife.vehicle.api;
 
 import com.luislipinski.trucklife.vehicle.application.VehicleOperations;
 import com.luislipinski.trucklife.vehicle.domain.VehicleAcquisitionType;
+import com.luislipinski.trucklife.vehicle.domain.VehicleCondition;
 import com.luislipinski.trucklife.vehicle.domain.VehicleStatus;
 import com.luislipinski.trucklife.vehicle.persistence.CareerVehicleEntity;
 import java.math.BigDecimal;
@@ -16,6 +17,9 @@ public record VehicleResponse(
         BigDecimal initialOdometer,
         BigDecimal purchasePrice,
         String displayCurrency,
+        VehicleCondition vehicleCondition,
+        String purchaseCountryCode,
+        String purchaseStateCode,
         VehicleAcquisitionType acquisitionType,
         VehicleStatus status,
         int acquiredOperationalWeek,
@@ -37,6 +41,9 @@ public record VehicleResponse(
                 vehicle.getInitialOdometer(),
                 vehicle.getPurchasePrice(),
                 vehicle.getDisplayCurrency(),
+                vehicle.getVehicleCondition(),
+                vehicle.getPurchaseCountryCode(),
+                vehicle.getPurchaseStateCode(),
                 vehicle.getAcquisitionType(),
                 vehicle.getStatus(),
                 vehicle.getAcquiredOperationalWeek(),
