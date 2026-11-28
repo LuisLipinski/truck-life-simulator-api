@@ -23,28 +23,68 @@ public class FinancingPolicyCatalog {
     }
 
     public List<FinancingOperations.Offer> offers(CareerEntity career,FinancialProductType productType,BigDecimal requestedAmount){
+        return offers(career, productType, requestedAmount, null, null);
+    }
+
+    public List<FinancingOperations.Offer> offers(
+            CareerEntity career,
+            FinancialProductType productType,
+            BigDecimal requestedAmount,
+            String jurisdictionCountryCode,
+            String jurisdictionStateCode
+    ){
         BigDecimal amount=money(requestedAmount);
         if(amount.compareTo(BigDecimal.ONE)<0)throw new IllegalArgumentException("Requested amount must be at least 1.00 in the career display currency");
-        FinancingJurisdictionCatalog.ResolvedPolicy policy=jurisdictionCatalog.resolve(career,productType,amount);
-        return terms(career.getGame(),productType).stream().map(term->offer(career,productType,amount,term,policy)).toList();
+        FinancingJurisdictionCatalog.ResolvedPolicy policy=jurisdictionCatalog.resolve(
+                career,productType,amount,jurisdictionCountryCode,jurisdictionStateCode);
+        return terms(career.getGame(),productType).stream()
+                .map(term->offer(career,productType,amount,term,policy,jurisdictionCountryCode,jurisdictionStateCode))
+                .toList();
     }
 
     public FinancingOperations.Offer offer(CareerEntity career,FinancialProductType productType,BigDecimal requestedAmount,int termPeriods){
+        return offer(career, productType, requestedAmount, termPeriods, null, null);
+    }
+
+    public FinancingOperations.Offer offer(
+            CareerEntity career,
+            FinancialProductType productType,
+            BigDecimal requestedAmount,
+            int termPeriods,
+            String jurisdictionCountryCode,
+            String jurisdictionStateCode
+    ){
         BigDecimal amount=money(requestedAmount);
         if(amount.compareTo(BigDecimal.ONE)<0)throw new IllegalArgumentException("Requested amount must be at least 1.00 in the career display currency");
         List<Integer> allowed=terms(career.getGame(),productType);
         if(!allowed.contains(termPeriods))throw new IllegalArgumentException("The selected term is not available for this product and game");
-        return offer(career,productType,amount,termPeriods,jurisdictionCatalog.resolve(career,productType,amount));
+        return offer(
+                career,
+                productType,
+                amount,
+                termPeriods,
+                jurisdictionCatalog.resolve(career,productType,amount,jurisdictionCountryCode,jurisdictionStateCode),
+                jurisdictionCountryCode,
+                jurisdictionStateCode
+        );
     }
 
     private FinancingOperations.Offer offer(CareerEntity career,FinancialProductType productType,BigDecimal amount,int termPeriods,
-            FinancingJurisdictionCatalog.ResolvedPolicy policy){
+            FinancingJurisdictionCatalog.ResolvedPolicy policy,String jurisdictionCountryCode,String jurisdictionStateCode){
         BigDecimal downPaymentRate=productType==FinancialProductType.VEHICLE_FINANCING?VEHICLE_DOWN_PAYMENT_RATE:ZERO_RATE;
         BigDecimal downPayment=amount.multiply(downPaymentRate).setScale(2,RoundingMode.HALF_UP);
         BigDecimal principal=amount.subtract(downPayment).setScale(2,RoundingMode.UNNECESSARY);
         FinancialPaymentFrequency frequency=frequency(career.getGame(),productType);
         Plan plan=plan(principal,policy.annualRate(),frequency,termPeriods);
-        String country=career.getGame()==CareerGame.ATS?"US":normalize(career.getCountryCode());
+        String country=career.getGame()==CareerGame.ATS
+                ?"US"
+                :normalizeOrFallback(jurisdictionCountryCode,career.getCountryCode());
+        String state=career.getGame()==CareerGame.ATS
+                ?normalizeOrFallback(jurisdictionStateCode,career.getStateCode())
+                :null;
+        boolean careerJurisdiction=career.getGame()==CareerGame.ATS
+                ?state.equals(normalize(career.getStateCode()))
+                :country.equals(normalize(career.getCountryCode()));
         return new FinancingOperations.Offer(
                 productType,
                 policy.version(),
@@ -52,8 +92,8 @@ public class FinancingPolicyCatalog {
                 policy.referenceAsOf(),
                 policy.rateBasis(),
                 country,
-                career.getGame()==CareerGame.ATS?normalize(career.getStateCode()):null,
-                career.getBaseCity(),
+                state,
+                careerJurisdiction?career.getBaseCity():null,
                 career.getDisplayCurrency(),
                 amount,
                 principal,
@@ -132,6 +172,7 @@ public class FinancingPolicyCatalog {
 
     private BigDecimal zeroMoney(){return BigDecimal.ZERO.setScale(2);}
     private String normalize(String value){return value==null?"":value.strip().toUpperCase(java.util.Locale.ROOT);}
+    private String normalizeOrFallback(String candidate,String fallback){String normalized=normalize(candidate);return normalized.isBlank()?normalize(fallback):normalized;}
 
     public record PeriodAmount(BigDecimal principal,BigDecimal interest,BigDecimal total){}
     public record Plan(List<PeriodAmount> periods,BigDecimal totalRepayment){}
