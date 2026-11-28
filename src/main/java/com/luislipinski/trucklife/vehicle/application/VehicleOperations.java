@@ -29,6 +29,7 @@ public interface VehicleOperations {
             CareerVehicleEntity vehicle,
             UUID financingContractId,
             short currentPhase,
-            BigDecimal currentBalance
+            BigDecimal currentBalance,
+            boolean replay
     ) {}
 }
