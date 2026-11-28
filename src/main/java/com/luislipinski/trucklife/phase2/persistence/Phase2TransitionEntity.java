@@ -78,6 +78,23 @@ public class Phase2TransitionEntity {
         this.updatedAt = updatedAt;
     }
 
+    public void refreshSettlement(
+            BigDecimal amount,
+            String policyVersion,
+            String policySource,
+            String policySummary,
+            String policySnapshotJson,
+            Instant now
+    ) {
+        if (status == Phase2TransitionStatus.COMPLETED) return;
+        this.statutorySettlementAmount = amount;
+        this.policyVersion = policyVersion;
+        this.policySource = policySource;
+        this.policySummary = policySummary;
+        this.policySnapshotJson = policySnapshotJson;
+        this.updatedAt = now;
+    }
+
     public void complete(UUID operationId, DayOfWeek effectiveDay, Phase2AffiliationChoice affiliation, Instant now) {
         if (status == Phase2TransitionStatus.COMPLETED) {
             if (!operationId.equals(completionOperationId)) {
