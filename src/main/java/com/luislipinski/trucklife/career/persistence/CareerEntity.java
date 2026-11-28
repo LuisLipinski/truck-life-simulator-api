@@ -37,6 +37,7 @@ public class CareerEntity {
     @Column(name = "city_market_label", length = 100) private String cityMarketLabel;
     @Column(name = "city_cost_factor", precision = 8, scale = 4) private BigDecimal cityCostFactor;
     @Column(name = "city_salary_factor", precision = 8, scale = 4) private BigDecimal citySalaryFactor;
+    @Column(name = "current_phase", nullable = false) private short currentPhase = 1;
     @Column(name = "current_operational_week", nullable = false) private int currentOperationalWeek;
     @Column(name = "current_payroll_month") private Integer currentPayrollMonth;
     @Column(name = "dangerous_goods_qualified", nullable = false) private boolean dangerousGoodsQualified;
@@ -75,7 +76,7 @@ public class CareerEntity {
     public String getDefaultTruckMake(){return defaultTruckMake;} public String getDefaultTruckModel(){return defaultTruckModel;}
     public String getCityMarketVersion(){return cityMarketVersion;} public String getCityMarketLabel(){return cityMarketLabel;}
     public BigDecimal getCityCostFactor(){return cityCostFactor;} public BigDecimal getCitySalaryFactor(){return citySalaryFactor;}
-    public int getCurrentOperationalWeek(){return currentOperationalWeek;} public Integer getCurrentPayrollMonth(){return currentPayrollMonth;}
+    public short getCurrentPhase(){return currentPhase;} public int getCurrentOperationalWeek(){return currentOperationalWeek;} public Integer getCurrentPayrollMonth(){return currentPayrollMonth;}
     public boolean isDangerousGoodsQualified(){return dangerousGoodsQualified;}
     public BigDecimal getPayrollLevel1GrossOverride(){return payrollLevel1GrossOverride;}
     public BigDecimal getPayrollRouteOverrunRateOverride(){return payrollRouteOverrunRateOverride;}
@@ -127,6 +128,13 @@ public class CareerEntity {
             throw new IllegalArgumentException("Balance debit must be non-negative");
         }
         this.balance=this.balance.subtract(amount); this.updatedAt=updatedAt;
+    }
+
+    public void unlockPhase2(Instant updatedAt) {
+        if (this.currentPhase < 2) {
+            this.currentPhase = 2;
+            this.updatedAt = updatedAt;
+        }
     }
 
     public void promoteTo(short targetLevel, Instant updatedAt) {

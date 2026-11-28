@@ -21,6 +21,7 @@ import java.util.UUID;
 public class FinancialContractEntity {
     @Id private UUID id;
     @Column(name="career_id",nullable=false) private UUID careerId;
+    @Column(name="vehicle_id") private UUID vehicleId;
     @Column(name="origination_operation_id",nullable=false,unique=true) private UUID originationOperationId;
     @Enumerated(EnumType.STRING) @Column(name="product_type",nullable=false,length=30) private FinancialProductType productType;
     @Enumerated(EnumType.STRING) @Column(nullable=false,length=20) private FinancialContractStatus status;
@@ -73,7 +74,7 @@ public class FinancialContractEntity {
         this.originatedPayrollMonth=originatedPayrollMonth;this.policySnapshotJson=policySnapshotJson;this.createdAt=createdAt;this.updatedAt=updatedAt;
     }
 
-    public UUID getId(){return id;} public UUID getCareerId(){return careerId;} public UUID getOriginationOperationId(){return originationOperationId;}
+    public UUID getId(){return id;} public UUID getCareerId(){return careerId;} public UUID getVehicleId(){return vehicleId;} public UUID getOriginationOperationId(){return originationOperationId;}
     public FinancialProductType getProductType(){return productType;} public FinancialContractStatus getStatus(){return status;}
     public String getPolicyVersion(){return policyVersion;} public String getPolicySource(){return policySource;}
     public LocalDate getPolicyReferenceAsOf(){return policyReferenceAsOf;} public String getRateBasis(){return rateBasis;}
@@ -88,6 +89,17 @@ public class FinancialContractEntity {
     public int getMaxMissedInstallments(){return maxMissedInstallments;} public int getOriginatedOperationalWeek(){return originatedOperationalWeek;}
     public Integer getOriginatedPayrollMonth(){return originatedPayrollMonth;} public String getPolicySnapshotJson(){return policySnapshotJson;}
     public Instant getCreatedAt(){return createdAt;} public Instant getUpdatedAt(){return updatedAt;} public long getVersion(){return version;}
+
+    public void linkVehicle(UUID vehicleId, Instant now) {
+        if (productType != FinancialProductType.VEHICLE_FINANCING) {
+            throw new IllegalStateException("Only vehicle financing contracts can be linked to a vehicle");
+        }
+        if (this.vehicleId != null && !this.vehicleId.equals(vehicleId)) {
+            throw new IllegalStateException("Financing contract is already linked to another vehicle");
+        }
+        this.vehicleId = vehicleId;
+        this.updatedAt = now;
+    }
 
     public void applyPrincipalPayment(BigDecimal amount,Instant now){
         if(amount==null||amount.signum()<0||amount.compareTo(remainingPrincipal)>0)throw new IllegalArgumentException("Principal payment is invalid");

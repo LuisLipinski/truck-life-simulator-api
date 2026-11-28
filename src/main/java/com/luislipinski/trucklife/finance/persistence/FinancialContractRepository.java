@@ -11,4 +11,5 @@ public interface FinancialContractRepository extends JpaRepository<FinancialCont
     List<FinancialContractEntity> findAllByCareerIdAndStatusInOrderByCreatedAtAscIdAsc(UUID careerId,List<FinancialContractStatus> statuses);
     Optional<FinancialContractEntity> findByIdAndCareerId(UUID id,UUID careerId);
     Optional<FinancialContractEntity> findByOriginationOperationId(UUID operationId);
+    Optional<FinancialContractEntity> findByVehicleId(UUID vehicleId);
 }
